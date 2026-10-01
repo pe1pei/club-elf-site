@@ -64,5 +64,5 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
 
 手順:
 1. GitHub にリポジトリを作って push する
-2. `gh-pages` ブランチに `public/` の中身と `data/site.json`（→ `site.json`）を置いて push（Settings → Pages は `gh-pages` ブランチ / root）
+2. `.\deploy-pages.ps1` を実行（`public/` と `data/site.json` を `gh-pages` ブランチに反映。Settings → Pages は `gh-pages` ブランチ / root）
 3. 数分後に `https://<ユーザー名>.github.io/<リポジトリ名>/` で見られます（管理画面は末尾に `admin/`）
