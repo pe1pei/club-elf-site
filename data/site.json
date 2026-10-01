@@ -1,0 +1,288 @@
+{
+  "shop": {
+    "name": "CLUB ELF",
+    "kana": "クラブ エルフ",
+    "phone": "090-4216-6625",
+    "hours": "20:00 〜 LAST",
+    "holiday": "日曜日",
+    "note": "ご予約承ります。お気軽にお電話ください。",
+    "address": "〒411-0036 静岡県三島市一番町11-14 第二KOHWAビル B1",
+    "access": "各線「三島駅」南口より徒歩3分",
+    "mapEmbed": ""
+  },
+  "system": {
+    "plans": [
+      {
+        "title": "通常料金　20:00〜LAST",
+        "items": [
+          {
+            "label": "1SET 60min",
+            "value": "4,000円"
+          },
+          {
+            "label": "延長 30min",
+            "value": "2,000円"
+          },
+          {
+            "label": "延長 60min",
+            "value": "4,000円"
+          },
+          {
+            "label": "シングルチャージ",
+            "value": "毎SET 1,000円"
+          },
+          {
+            "label": "キャストドリンク",
+            "value": "1,000円"
+          },
+          {
+            "label": "本指名",
+            "value": "1,000円"
+          },
+          {
+            "label": "場内指名",
+            "value": "1,000円"
+          },
+          {
+            "label": "同伴料",
+            "value": "3,000円"
+          }
+        ]
+      }
+    ],
+    "note": "TAX・サービス料 20%　／　目安予算 5,100円〜8,000円"
+  },
+  "hero": {
+    "images": [],
+    "catch": "三島の夜を、上質に。",
+    "sub": "三島駅南口から徒歩3分。\nゆったりくつろげるラグジュアリー空間でお待ちしております。",
+    "interval": 6
+  },
+  "casts": [
+    {
+      "id": "c01",
+      "name": "まきママ",
+      "profile": "",
+      "tags": [
+        "ママ"
+      ],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c02",
+      "name": "みさき",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c03",
+      "name": "ゆう",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c04",
+      "name": "いちか",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c05",
+      "name": "ここな",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c06",
+      "name": "りな",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c07",
+      "name": "ゆか",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c08",
+      "name": "水城 志帆",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c09",
+      "name": "あやか",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c10",
+      "name": "さやか",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c11",
+      "name": "立花 まゆ",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c12",
+      "name": "りあな",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c13",
+      "name": "すい",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    },
+    {
+      "id": "c14",
+      "name": "みさ",
+      "profile": "",
+      "tags": [],
+      "comment": "",
+      "photo": "",
+      "visible": true
+    }
+  ],
+  "shift": {
+    "enabled": true,
+    "defaultTime": "20:00〜",
+    "dayStart": 6
+  },
+  "shifts": {},
+  "branches": [],
+  "sns": [
+    {
+      "type": "instagram",
+      "url": ""
+    },
+    {
+      "type": "tiktok",
+      "url": ""
+    },
+    {
+      "type": "x",
+      "url": ""
+    },
+    {
+      "type": "line",
+      "url": ""
+    }
+  ],
+  "recruit": {
+    "cast": {
+      "enabled": true,
+      "catch": "NEW CAST 大募集。未経験でも高収入。",
+      "body": "体験入店で日払いお給料GET！\nお仕事が初めての方も、スタッフが丁寧にサポートします。",
+      "items": [
+        {
+          "label": "給与",
+          "value": "体入 時給 8,000円\n本入 時給 2,500円〜"
+        },
+        {
+          "label": "勤務時間",
+          "value": "20:00 〜 LAST（応相談）"
+        },
+        {
+          "label": "定休日",
+          "value": "日曜日"
+        },
+        {
+          "label": "勤務地",
+          "value": "三島市一番町（三島駅南口 徒歩3分）"
+        },
+        {
+          "label": "資格",
+          "value": "18歳以上（高校生不可）"
+        }
+      ],
+      "perks": [
+        "未経験歓迎",
+        "体入OK",
+        "日払いOK",
+        "駅近 徒歩3分"
+      ]
+    },
+    "staff": {
+      "enabled": true,
+      "catch": "店長・管理職経験者を募集しています。",
+      "body": "「今までの経験をもっと評価してほしい」「自分の力でお店を動かしてみたい」\nそんな方を歓迎します。",
+      "items": [
+        {
+          "label": "職種",
+          "value": "店長候補 / 管理職 / ホールスタッフ"
+        },
+        {
+          "label": "給与",
+          "value": "経験・能力を考慮して決定"
+        },
+        {
+          "label": "勤務時間",
+          "value": "19:00 〜 LAST"
+        },
+        {
+          "label": "資格",
+          "value": "18歳以上（高校生不可）"
+        }
+      ],
+      "perks": [
+        "経験者優遇",
+        "役職登用あり"
+      ]
+    },
+    "apply": {
+      "phone": "090-4216-6625",
+      "line": "",
+      "email": "",
+      "note": "面接・体験入店は随時受付中。お気軽にご連絡ください。"
+    }
+  },
+  "theme": {
+    "accent": "#c9a35a",
+    "bg": "#0c0a0f"
+  }
+}

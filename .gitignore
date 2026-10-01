@@ -1,0 +1,6 @@
+node_modules/
+data/backups/
+public/uploads/*
+!public/uploads/.gitkeep
+_site/
+*.tmp

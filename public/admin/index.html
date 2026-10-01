@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>管理画面</title>
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div id="login" class="login" hidden>
+  <form class="login-box" id="loginForm">
+    <h1>管理画面</h1>
+    <label class="f"><span>パスワード</span><input type="password" name="password" autocomplete="current-password" required autofocus></label>
+    <p class="err" id="loginErr"></p>
+    <button class="btn primary wide">ログイン</button>
+  </form>
+</div>
+
+<div id="app" class="app" hidden>
+  <header class="top">
+    <strong class="brand" id="brand">管理画面</strong>
+    <span class="state" id="state"></span>
+    <div class="top-actions">
+      <button class="btn ghost" id="discard" hidden>変更を破棄</button>
+      <button class="btn primary" id="save" disabled title="Ctrl + S">保存して公開</button>
+      <a class="btn ghost hide-sm" href="/" target="_blank" rel="noopener">公開ページ ↗</a>
+      <button class="btn ghost hide-sm" id="logout">ログアウト</button>
+    </div>
+  </header>
+  <div class="warn" id="warn" hidden>管理パスワードが初期値のままです。公開前に必ず変更してください（README 参照）。</div>
+
+  <div class="work">
+    <aside class="side">
+      <nav class="tabs" id="tabs"></nav>
+      <div class="panel" id="panel"></div>
+    </aside>
+    <section class="stage">
+      <div class="stage-bar">
+        <span class="stage-label" id="stageLabel">プレビュー（未保存の変更も反映されます）</span>
+        <div class="seg" id="device">
+          <button data-d="pc" class="on">PC</button>
+          <button data-d="sp">スマホ</button>
+        </div>
+      </div>
+      <div class="frame-wrap" id="frameWrap"><iframe id="frame" title="プレビュー"></iframe></div>
+    </section>
+  </div>
+  <button class="preview-toggle" id="previewToggle">プレビューを見る</button>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>
