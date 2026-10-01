@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+
+Sitemap: https://pe1pei.github.io/club-elf-site/sitemap.xml
