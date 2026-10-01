@@ -21,6 +21,11 @@
   };
   // 画像: サーバー保存分（uploads/…）と、お試しモードでブラウザ内に持つ data:image を許可
   const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) ? u : safeUrl(u));
+  // 写真未登録のキャストは店のロゴ画像を出す
+  const NO_PHOTO = 'no-photo.webp';
+  const photoImg = (c, alt, lazy) => c.photo
+    ? `<img src="${esc(imgUrl(c.photo))}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`
+    : `<img class="no-photo" src="${NO_PHOTO}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
   const cssUrl = (u) => imgUrl(u).replace(/["'()\\\s]/g, encodeURIComponent);
   const telNo = (p) => String(p || '').replace(/[^\d+]/g, '');
 
@@ -140,7 +145,7 @@
       ${list.length ? `<div class="cast-grid">${list.map((c) => `
         <button class="cast" data-id="${esc(c.id)}">
           <div class="ph">
-            ${c.photo ? `<img src="${esc(imgUrl(c.photo))}" alt="${esc(c.name)}" loading="lazy">` : `<span class="initial">${esc((c.name || '?').slice(0, 1))}</span>`}
+            ${photoImg(c, c.name, true)}
             ${on && shiftOf(s, tk, c.id) ? `<span class="badge">本日出勤 ${esc(shiftOf(s, tk, c.id))}</span>` : ''}
           </div>
           <p class="nm">${esc(c.name)}</p>
@@ -165,7 +170,7 @@
       }).join('')}</div>
       ${list.length ? `<div class="sched-list">${list.map((c) => `
         <button class="sc" data-id="${esc(c.id)}">
-          <span class="sc-ph">${c.photo ? `<img src="${esc(imgUrl(c.photo))}" alt="" loading="lazy">` : `<span class="initial">${esc((c.name || '?').slice(0, 1))}</span>`}</span>
+          <span class="sc-ph">${photoImg(c, '', true)}</span>
           <span class="sc-nm">${esc(c.name)}</span>
           <span class="sc-tm">${esc(shiftOf(s, key, c.id))}</span>
         </button>`).join('')}</div>`
@@ -336,7 +341,7 @@
     const week = on ? Array.from({ length: 7 }, (_, i) => addDays(tk, i)) : [];
     dlg.innerHTML = `<div class="modal-inner">
       <button class="modal-close" aria-label="閉じる">×</button>
-      <div class="modal-ph">${c.photo ? `<img src="${esc(imgUrl(c.photo))}" alt="${esc(c.name)}">` : `<span class="initial">${esc((c.name || '?').slice(0, 1))}</span>`}</div>
+      <div class="modal-ph">${photoImg(c, c.name, false)}</div>
       <div class="modal-body">
         ${on && shiftOf(site, tk, c.id) ? `<span class="badge static">本日出勤 ${esc(shiftOf(site, tk, c.id))}</span>` : ''}
         <h3>${esc(c.name)}</h3>
