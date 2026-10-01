@@ -161,7 +161,7 @@
       ${title('SCHEDULE', '出勤情報')}
       <div class="days" role="tablist">${days.map((k, i) => {
         const l = dayLabel(k);
-        return `<button data-day="${i}" class="${i === schedDay ? 'on' : ''} ${l.w === 0 ? 'sun' : l.w === 6 ? 'sat' : ''}"><b>${i === 0 ? 'TODAY' : l.md}</b><small>${i === 0 ? l.md : ''}（${l.dow}）</small></button>`;
+        return `<button data-day="${i}" class="${i === schedDay ? 'on' : ''} ${l.w === 0 ? 'sun' : l.w === 6 ? 'sat' : ''}"><b>${l.md}</b><small>${i === 0 ? '今日' : ''}（${l.dow}）</small></button>`;
       }).join('')}</div>
       ${list.length ? `<div class="sched-list">${list.map((c) => `
         <button class="sc" data-id="${esc(c.id)}">
