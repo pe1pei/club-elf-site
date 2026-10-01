@@ -1,14 +1,13 @@
 ﻿# GitHub Pages（お試し版）へ反映する。
-# public/ の中身と data/site.json を gh-pages ブランチとして上書き push する。
+# tools/build-pages.js で書き出した静的ファイルを gh-pages ブランチとして上書き push する。
 # 使い方: PowerShell で  .\deploy-pages.ps1
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 $out = Join-Path ([System.IO.Path]::GetTempPath()) ("club-elf-pages-" + [guid]::NewGuid().ToString('N'))
 
 New-Item -ItemType Directory $out | Out-Null
-Copy-Item -Recurse (Join-Path $src 'public\*') $out
-Copy-Item (Join-Path $src 'data\site.json') (Join-Path $out 'site.json')
-New-Item (Join-Path $out '.nojekyll') -ItemType File | Out-Null
+node (Join-Path $src 'tools\build-pages.js') $out
+if ($LASTEXITCODE -ne 0) { throw 'build-pages.js に失敗しました' }
 
 $remote = git -C $src remote get-url origin
 $email = git -C $src config user.email

@@ -15,6 +15,7 @@
     { id: 'shop', label: '店舗情報', page: 'index', section: 'info' },
     { id: 'branches', label: '支店', page: 'index', section: 'branches' },
     { id: 'sns', label: 'SNS', page: 'index', section: 'footer' },
+    { id: 'seo', label: 'SEO', page: 'index', section: 'about' },
     { id: 'theme', label: 'デザイン', page: 'index', section: 'top' },
   ];
   const SNS_TYPES = [['instagram', 'Instagram'], ['x', 'X'], ['tiktok', 'TikTok'], ['line', 'LINE'], ['youtube', 'YouTube'], ['web', 'その他URL']];
@@ -92,6 +93,7 @@
     s.hero ||= {}; s.hero.images ||= [];
     s.casts ||= []; s.branches ||= []; s.sns ||= [];
     s.theme ||= { accent: '#c9a35a', bg: '#0c0a0f' };
+    s.seo ||= {}; s.seo.keywords ||= [];
     s.system ||= {};
     if (s.system.items) { s.system.plans = [{ title: '', items: s.system.items }]; delete s.system.items; }
     s.system.plans ||= [];
@@ -452,6 +454,33 @@
         <div class="bar">${SNS_TYPES.map(([v, l]) => `<button class="btn sm" data-act="sns-add" data-type="${v}">＋ ${l}</button>`).join('')}</div>`;
     },
 
+    seo() {
+      const s = site.seo;
+      const len = (v) => [...String(v || '')].length;
+      const counter = (path, max) => `いま <b data-count="${path}">${len(getPath(path))}</b>文字（目安 ${max}文字まで）`;
+      return `
+        <p class="hint">検索結果やLINE・Xでリンクを貼ったときに出る文章です。見えない文字で言葉を詰め込むのは Google の規約違反になるので、<b>人が読んで自然な文章</b>に検索されたい言葉を入れてください。</p>
+        <h3>Google の検索結果での見え方（トップページ）</h3>
+        <div class="serp">
+          <div class="serp-url">${esc(s.siteUrl || '')}</div>
+          <div class="serp-title" data-label="seo.title" data-empty="（タイトル未入力）">${esc(s.title) || '（タイトル未入力）'}</div>
+          <div class="serp-desc" data-label="seo.description" data-empty="（説明文未入力）">${esc(s.description) || '（説明文未入力）'}</div>
+        </div>
+        ${field('ページタイトル', 'seo.title', { hint: '店名＋地名＋業種を入れる（例：CLUB ELF｜三島駅南口のキャバクラ）。' + counter('seo.title', 32) })}
+        ${field('説明文', 'seo.description', { rows: 3, hint: '検索結果のタイトルの下に出る文。' + counter('seo.description', 120) })}
+        <h3>お店紹介（トップページの「ABOUT」に表示）</h3>
+        <p class="hint">検索に一番効くのはここです。「三島」「三島駅」「キャバクラ」など、探されそうな言葉を自然に入れた紹介文にしてください。空欄なら ABOUT 欄は表示されません。</p>
+        ${field('見出し', 'seo.introTitle', { ph: '例：三島駅南口のキャバクラ CLUB ELF' })}
+        ${field('紹介文', 'seo.intro', { rows: 6 })}
+        <h3>求人ページ</h3>
+        ${field('ページタイトル', 'seo.recruitTitle', { hint: counter('seo.recruitTitle', 32) })}
+        ${field('説明文', 'seo.recruitDescription', { rows: 3, hint: counter('seo.recruitDescription', 120) })}
+        <h3>その他</h3>
+        ${field('キーワード', 'seo.keywords', { list: true, rows: 2, hint: '「、」区切り。Google はほぼ参照しないので、上の文章に入れることのほうが大切です' })}
+        ${field('価格帯', 'seo.priceRange', { ph: '例：¥5,100〜¥8,000', hint: 'Google 向けのお店情報（構造化データ）に入ります' })}
+        ${field('サイトのURL', 'seo.siteUrl', { type: 'url', hint: '独自ドメインに移したらここを変更（サイトマップ・共有時のURLに使われます）' })}`;
+    },
+
     theme() {
       const t = site.theme;
       return `
@@ -482,7 +511,8 @@
     else v = el.value;
     setPath(path, v);
     // 一覧の見出しなど、入力欄以外の表示を追従させる
-    panel.querySelectorAll(`[data-label="${path}"]`).forEach((n) => { n.textContent = v || '（名前未入力）'; });
+    panel.querySelectorAll(`[data-label="${path}"]`).forEach((n) => { n.textContent = v || n.dataset.empty || '（名前未入力）'; });
+    panel.querySelectorAll(`[data-count="${path}"]`).forEach((n) => { n.textContent = [...String(v)].length; });
     if (el.type === 'color') el.nextElementSibling.nextElementSibling.textContent = v;
     const structural = el.type === 'checkbox' || el.type === 'color';
     changed({ rerender: structural });

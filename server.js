@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const crypto = require('crypto');
+const seo = require('./lib/seo');
 
 const PORT = Number(process.env.PORT) || 3200;
 const PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
@@ -133,6 +134,18 @@ async function serveStatic(req, res, url) {
   if (rel === '/admin') { res.writeHead(301, { Location: '/admin/' }); return res.end(); }
   if (rel === '/recruit') rel = '/recruit.html';
   if (rel.endsWith('/')) rel += 'index.html';
+
+  // 公開ページは、検索・SNS 向けの <head> 情報を最新データで埋め込んで返す
+  const page = { '/index.html': 'index', '/recruit.html': 'recruit' }[rel];
+  if (page || rel === '/sitemap.xml' || rel === '/robots.txt') {
+    const site = JSON.parse(await fsp.readFile(DATA, 'utf8'));
+    let body, type;
+    if (page) { body = seo.injectHead(await fsp.readFile(path.join(PUB, rel), 'utf8'), site, page); type = MIME['.html']; }
+    else if (rel === '/sitemap.xml') { body = seo.sitemap(site); type = 'application/xml; charset=utf-8'; }
+    else { body = seo.robots(site); type = 'text/plain; charset=utf-8'; }
+    res.writeHead(body ? 200 : 404, { 'Content-Type': type, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+    return res.end(body);
+  }
   const file = path.join(PUB, path.normalize(rel));
   if (!file.startsWith(PUB + path.sep)) { res.writeHead(403); return res.end(); }
   try {

@@ -192,3 +192,10 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .settings { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 10px; }
 .settings summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
 .warn .btn { margin-left: 8px; }
+
+/* SEO */
+.serp { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; background: #fff; font-family: Arial, "Hiragino Sans", "Meiryo", sans-serif; }
+.serp-url { font-size: 12px; color: #4d5156; word-break: break-all; }
+.serp-title { font-size: 18px; color: #1a0dab; line-height: 1.35; margin: 2px 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.serp-desc { font-size: 13px; color: #4d5156; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.f small b { color: var(--fg); }

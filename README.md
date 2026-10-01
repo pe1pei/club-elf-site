@@ -66,3 +66,11 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
 1. GitHub にリポジトリを作って push する
 2. `.\deploy-pages.ps1` を実行（`public/` と `data/site.json` を `gh-pages` ブランチに反映。Settings → Pages は `gh-pages` ブランチ / root）
 3. 数分後に `https://<ユーザー名>.github.io/<リポジトリ名>/` で見られます（管理画面は末尾に `admin/`）
+
+## SEO
+
+- 管理画面の「SEO」タブで、検索結果のタイトル・説明文、トップの紹介文（ABOUT）、求人ページの文言、キーワード、価格帯を編集できます。
+- 公開ページの HTML には、配信時（`server.js`）／書き出し時（`tools/build-pages.js`）に次を埋め込みます（`lib/seo.js`）:
+  タイトル・説明文・OGP（LINE / X の共有表示）・canonical・構造化データ（NightClub：住所・電話・価格帯）
+- `sitemap.xml` と `robots.txt` も自動で出ます。Google Search Console にサイトマップを登録してください。
+- 見えない文字でキーワードを詰め込むのは Google の規約違反（順位低下・除外の対象）なので行いません。

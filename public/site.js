@@ -184,6 +184,16 @@
     </section>`;
   }
 
+  // お店紹介文。検索されたい言葉（三島・キャバクラ など）を、見える自然な文章として載せる場所
+  function aboutHTML(s) {
+    const seo = s.seo || {};
+    if (!seo.intro) return '';
+    return `<section class="sec about" id="about">
+      <h2 class="sec-title"><span>ABOUT</span><small>${esc(seo.introTitle || s.shop.name)}</small></h2>
+      <p class="about-text">${nl(seo.intro)}</p>
+    </section>`;
+  }
+
   function infoHTML(s) {
     const sh = s.shop;
     const tel = telNo(sh.phone);
@@ -299,11 +309,18 @@
     const root = document.documentElement.style;
     root.setProperty('--accent', s.theme?.accent || '#c9a35a');
     root.setProperty('--bg', s.theme?.bg || '#0c0a0f');
-    document.title = PAGE === 'recruit' ? `求人情報 | ${s.shop.name || ''}` : `${s.shop.name || ''}${s.hero?.catch ? ' | ' + s.hero.catch : ''}`;
+    // 検索結果用のタイトル・説明（初期値はサーバー/書き出し時に HTML へ埋め込み済み。プレビュー用に追従させる）
+    const seo = s.seo || {};
+    document.title = PAGE === 'recruit'
+      ? (seo.recruitTitle || `求人情報 | ${s.shop.name || ''}`)
+      : (seo.title || `${s.shop.name || ''}${s.hero?.catch ? ' | ' + s.hero.catch : ''}`);
+    const desc = PAGE === 'recruit' ? seo.recruitDescription : seo.description;
+    let meta = document.querySelector('meta[name="description"]');
+    if (desc) { if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.append(meta); } meta.content = desc; }
 
     const parts = PAGE === 'recruit'
       ? ['header', 'recruit', 'footer', 'callbar']
-      : ['header', 'hero', 'cast', 'schedule', 'info', 'access', 'branches', 'recruitBanner', 'footer', 'callbar'];
+      : ['header', 'hero', 'cast', 'schedule', 'about', 'info', 'access', 'branches', 'recruitBanner', 'footer', 'callbar'];
     if (!app.firstElementChild) {
       app.innerHTML = parts.map((p) => `<div data-part="${p}"></div>`).join('') + '<dialog class="modal" id="castModal"></dialog>';
     }
@@ -317,6 +334,7 @@
       if (patch('hero', heroHTML(s))) startSlides(s.hero?.interval);
       patch('cast', castHTML(s));
       patch('schedule', scheduleHTML(s));
+      patch('about', aboutHTML(s));
       patch('info', infoHTML(s));
       patch('access', accessHTML(s));
       patch('branches', branchesHTML(s));
