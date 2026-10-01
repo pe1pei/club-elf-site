@@ -1,4 +1,4 @@
-# GitHub Pages（お試し版）へ反映する。
+﻿# GitHub Pages（お試し版）へ反映する。
 # public/ の中身と data/site.json を gh-pages ブランチとして上書き push する。
 # 使い方: PowerShell で  .\deploy-pages.ps1
 $ErrorActionPreference = 'Stop'
