@@ -1,4 +1,4 @@
-# キャバクラ ホームページ（管理画面つき）
+﻿# キャバクラ ホームページ（管理画面つき）
 
 Node.js だけで動きます（追加インストール不要）。
 
@@ -64,5 +64,5 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
 
 手順:
 1. GitHub にリポジトリを作って push する
-2. リポジトリの **Settings → Pages → Source** を「**GitHub Actions**」にする
+2. `gh-pages` ブランチに `public/` の中身と `data/site.json`（→ `site.json`）を置いて push（Settings → Pages は `gh-pages` ブランチ / root）
 3. 数分後に `https://<ユーザー名>.github.io/<リポジトリ名>/` で見られます（管理画面は末尾に `admin/`）
