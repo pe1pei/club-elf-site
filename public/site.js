@@ -65,13 +65,19 @@
     return false;
   }
 
+  // 同じビルに複数店舗があると住所だけでは候補一覧になりピンが立たないので、
+  // 検索ワード（店名＋住所）を優先する。無ければ郵便番号を除いた住所。
+  const mapQuery = (shop) => String(shop.mapQuery || '').trim()
+    || String(shop.address || '').replace(/〒?s*d{3}-?d{4}s*/, '').trim();
+
   function mapSrc(shop) {
     const raw = String(shop.mapEmbed || '').trim();
     const m = raw.match(/src="([^"]+)"/);
     const s = (m ? m[1] : raw).replace(/&amp;/g, '&');
     if (/^https:\/\/(www\.)?google\.[a-z.]+\/maps/.test(s) || /^https:\/\/maps\.google\./.test(s)) return s;
-    if (!shop.address) return '';
-    return `https://maps.google.com/maps?q=${encodeURIComponent(shop.address)}&z=16&hl=ja&output=embed`;
+    const q = mapQuery(shop);
+    if (!q) return '';
+    return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=17&hl=ja&output=embed`;
   }
 
   const recruitOn = (s) => ['cast', 'staff'].filter((k) => s.recruit?.[k]?.enabled);
@@ -223,7 +229,7 @@
           ${sh.holiday ? `<dt>定休日</dt><dd>${nl(sh.holiday)}</dd>` : ''}
         </dl>
         ${src ? `<div class="map"><iframe src="${esc(src)}" title="${esc(sh.name)} の地図" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-          ${sh.address ? `<a class="map-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sh.address)}" target="_blank" rel="noopener">${ICON.pin} Googleマップで開く</a>` : ''}</div>` : ''}
+          ${mapQuery(sh) ? `<a class="map-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery(sh))}" target="_blank" rel="noopener">${ICON.pin} Googleマップで開く</a>` : ''}</div>` : ''}
       </div>
     </section>`;
   }
