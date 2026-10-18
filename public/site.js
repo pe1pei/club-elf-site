@@ -22,7 +22,7 @@
   // 画像: サーバー保存分（uploads/…）と、お試しモードでブラウザ内に持つ data:image を許可
   const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) ? u : safeUrl(u));
   // 写真未登録のキャストは店のロゴ画像を出す
-  const NO_PHOTO = 'no-photo.webp';
+  const NO_PHOTO = 'no-photo.jpg';
   const photoImg = (c, alt, lazy) => c.photo
     ? `<img src="${esc(imgUrl(c.photo))}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`
     : `<img class="no-photo" src="${NO_PHOTO}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
