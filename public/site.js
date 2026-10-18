@@ -11,7 +11,38 @@
   let slideTimer = null;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const nl = (s) => esc(s).replace(/\n/g, '<br>');
+  // 日本語の折り返し：単語の区切りにだけ <wbr> を入れ、CSS（word-break: keep-all）で単語の途中では改行させない。
+  // 区切りはブラウザ標準の Intl.Segmenter（iPhone/Android とも対応）。細かく切れすぎるので次は前後とくっつける：
+  // 助詞・語尾（で／ます）、句読点・閉じ括弧、開き括弧の次、数字＋単位、1文字の漢字（静岡＋県、日＋払い）、接頭の「お／ご」は次の語へ。
+  const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  const KANJI = /[㐀-鿿]/;
+  function jpChunks(s) {
+    const out = [];
+    let prefix = '';
+    for (let { segment } of segmenter.segment(s)) {
+      if (/^[おご]$/.test(segment)) { prefix += segment; continue; }
+      segment = prefix + segment;
+      prefix = '';
+      const prev = out[out.length - 1];
+      const glue = prev !== undefined && (
+        /^[ぁ-ゟ]{1,3}$/.test(segment)
+        || /^[、。，．！？!?）」』】・…ー〜\s]+$/.test(segment)
+        || /[「『（【(]$/.test(prev)
+        || (/[0-9０-９]$/.test(prev) && /^[0-9０-９,，.%％円分時人名日週月年回件歳]/.test(segment))
+        || (segment.length === 1 && KANJI.test(segment) && KANJI.test(prev.slice(-1)))
+        || (/^[㐀-鿿][ぁ-ゟ]$/.test(prev) && KANJI.test(segment[0])) // 立ち＋寄り、落ち＋着いた
+        || (prev.length === 1 && KANJI.test(prev) && /[3400-9fff0-9０-９]/.test(segment[0]))
+      );
+      if (glue) out[out.length - 1] += segment; else out.push(segment);
+    }
+    if (prefix) out.push(prefix);
+    return out;
+  }
+  const jp = (s) => {
+    s = String(s ?? '');
+    return segmenter ? jpChunks(s).map(esc).join('<wbr>') : esc(s);
+  };
+  const nl = (s) => String(s ?? '').split('\n').map(jp).join('<br>');
   const safeUrl = (u) => {
     u = String(u ?? '').trim();
     if (!u) return '';
@@ -131,7 +162,7 @@
         ${h.logo
           ? `<h1 class="hero-logo"><img src="${esc(imgUrl(h.logo))}" alt="${esc(s.shop.name)}"></h1>`
           : `<h1>${esc(s.shop.name)}</h1>`}
-        ${h.catch ? `<p class="hero-catch">${esc(h.catch)}</p>` : ''}
+        ${h.catch ? `<p class="hero-catch">${jp(h.catch)}</p>` : ''}
         ${h.sub ? `<p class="hero-sub">${nl(h.sub)}</p>` : ''}
       </div>
       <a class="scroll-cue" href="#cast">SCROLL</a>
@@ -359,7 +390,7 @@
     const label = { cast: ['CAST', 'キャスト募集'], staff: ['STAFF', 'スタッフ募集'] };
     return `<section class="sec" id="recruit-banner">
       ${title('RECRUIT', '求人情報')}
-      <div class="rb">${on.map((k) => `<a class="rb-item" href="recruit.html#${k}"><span>${label[k][0]}</span><b>${label[k][1]}</b><small>${esc(s.recruit[k].catch)}</small><i>詳しく見る →</i></a>`).join('')}</div>
+      <div class="rb">${on.map((k) => `<a class="rb-item" href="recruit.html#${k}"><span>${label[k][0]}</span><b>${label[k][1]}</b><small>${jp(s.recruit[k].catch)}</small><i>詳しく見る →</i></a>`).join('')}</div>
     </section>`;
   }
 
@@ -376,7 +407,7 @@
       ${title('RECRUIT', '求人情報')}
       ${on.length > 1 ? `<div class="filter job-tabs">${on.map((k) => `<button data-job="${k}" class="${k === job ? 'on' : ''}">${label[k]}</button>`).join('')}</div>` : ''}
       <div class="job" id="${job}">
-        ${r.catch ? `<p class="job-catch">${esc(r.catch)}</p>` : ''}
+        ${r.catch ? `<p class="job-catch">${jp(r.catch)}</p>` : ''}
         ${r.body ? `<p class="job-body">${nl(r.body)}</p>` : ''}
         ${(r.perks || []).length ? `<ul class="perks">${r.perks.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
         ${(r.items || []).filter((i) => i.label || i.value).length ? `<dl class="dl job-dl">${r.items.filter((i) => i.label || i.value).map((i) => `<dt>${esc(i.label)}</dt><dd>${nl(i.value)}</dd>`).join('')}</dl>` : ''}

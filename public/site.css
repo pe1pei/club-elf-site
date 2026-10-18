@@ -252,3 +252,8 @@ svg { width: 1em; height: 1em; flex: none; }
 /* トップのロゴ画像（店名の代わり） */
 .hero-logo { margin: .25em 0 .4em; line-height: 0; }
 .hero-logo img { display: inline-block; width: min(560px, 82vw); height: auto; filter: drop-shadow(0 4px 24px #000c); }
+
+/* 日本語の折り返し：site.js が単語の区切りに <wbr> を入れるので、単語の途中では改行しない */
+body { word-break: keep-all; overflow-wrap: anywhere; line-break: strict; }
+p, dd, small { text-wrap: pretty; }
+.hero-catch, .job-catch, .sec-title small { text-wrap: balance; }
