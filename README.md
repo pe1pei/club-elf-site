@@ -97,3 +97,4 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
 - 保存のたびに `data/backups/` に直前の状態が30件まで残ります。
 - `data/`・`lib/`・`templates/` は `.htaccess` で外から見えません。`uploads/` は画像以外を返しません。
 - 手元での確認: `php -S localhost:3400 -t dist-sakura tools/php-router.php`
+- **更新のアップロード（SSH 鍵登録済みの場合）**: `sh tools/deploy-sakura.sh`（`~/.ssh/config` の `clubelf` → `~/www`。本番データ・写真は上書きしない）
