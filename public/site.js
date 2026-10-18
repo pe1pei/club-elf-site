@@ -20,7 +20,8 @@
     return 'https://' + u;
   };
   // 画像: サーバー保存分（uploads/…）と、お試しモードでブラウザ内に持つ data:image を許可
-  const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) ? u : safeUrl(u));
+  // サイト同梱の画像（logo-horizontal.png など）も相対パスのまま使う
+  const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) || /^[\w-]+\.(png|jpe?g|webp|gif)$/i.test(u) ? u : safeUrl(u));
   // 写真未登録のキャストは店のロゴ画像を出す
   const NO_PHOTO = 'no-photo.jpg';
   const photoImg = (c, alt, lazy) => c.photo
@@ -127,7 +128,9 @@
       <div class="hero-shade"></div>
       <div class="hero-text">
         ${s.shop.kana ? `<p class="hero-kana">${esc(s.shop.kana)}</p>` : ''}
-        <h1>${esc(s.shop.name)}</h1>
+        ${h.logo
+          ? `<h1 class="hero-logo"><img src="${esc(imgUrl(h.logo))}" alt="${esc(s.shop.name)}"></h1>`
+          : `<h1>${esc(s.shop.name)}</h1>`}
         ${h.catch ? `<p class="hero-catch">${esc(h.catch)}</p>` : ''}
         ${h.sub ? `<p class="hero-sub">${nl(h.sub)}</p>` : ''}
       </div>

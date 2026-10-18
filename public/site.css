@@ -248,3 +248,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .cast-strip { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px var(--gutter) 18px;
   margin: 0 calc(-1 * var(--gutter)); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .cast-strip .cast { flex: 0 0 clamp(200px, 62vw, 280px); scroll-snap-align: center; }
+
+/* トップのロゴ画像（店名の代わり） */
+.hero-logo { margin: .25em 0 .4em; line-height: 0; }
+.hero-logo img { display: inline-block; width: min(560px, 82vw); height: auto; filter: drop-shadow(0 4px 24px #000c); }

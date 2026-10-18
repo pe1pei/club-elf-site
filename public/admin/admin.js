@@ -384,6 +384,15 @@
     hero() {
       const imgs = site.hero.images;
       return `
+        <h3>ロゴ</h3>
+        <div class="logo-ed">
+          ${site.hero.logo ? `<span class="logo-prev"><img src="${esc(imgSrc(site.hero.logo))}" alt=""></span>` : `<span class="logo-prev empty">${esc(site.shop.name) || '店名'}（文字で表示中）</span>`}
+          <div class="bar">
+            <button class="btn sm" data-act="logo-set">${site.hero.logo ? 'ロゴを変更' : 'ロゴ画像を選ぶ'}</button>
+            ${site.hero.logo ? '<button class="btn sm ghost" data-act="logo-clear">文字で表示する</button>' : ''}
+          </div>
+        </div>
+        <p class="hint">トップの店名の位置に出ます。背景が透明な PNG がおすすめ。</p>
         <h3>スライド画像</h3>
         <p class="hint">横長（16:9 くらい）の写真がおすすめ。2枚以上で自動スライドします。1枚目が最初に表示されます。</p>
         <div class="slides-ed">
@@ -654,6 +663,17 @@
       site.casts[i].photo = '';
       return changed({ rerender: true });
     }
+    if (act === 'logo-set') {
+      const [file] = await pickFiles(false);
+      if (!file) return;
+      const url = await upload(file, 1400, 'image/png');
+      if (url) { site.hero.logo = url; changed({ rerender: true }); }
+      return;
+    }
+    if (act === 'logo-clear') {
+      site.hero.logo = '';
+      return changed({ rerender: true });
+    }
     if (act === 'hero-add') {
       const files = await pickFiles(true);
       for (const f of files) {
@@ -690,7 +710,7 @@
     });
   }
   // ブラウザ側で縮小してから送る（スマホ写真をそのまま載せると重いため）
-  async function upload(file, max) {
+  async function upload(file, max, type = 'image/jpeg') {
     try {
       toast('画像をアップロード中…');
       if (DEMO) max = Math.min(max, 640); // ブラウザ保存は容量が小さいので控えめに
@@ -700,7 +720,7 @@
       c.width = Math.round(bmp.width * k);
       c.height = Math.round(bmp.height * k);
       c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-      const dataUrl = c.toDataURL('image/jpeg', DEMO ? 0.75 : 0.86);
+      const dataUrl = c.toDataURL(type, DEMO ? 0.75 : 0.86);
       if (DEMO) { toast('画像を追加しました（お試しモード）'); return dataUrl; }
       const { url } = await api('/api/upload', { method: 'POST', body: JSON.stringify({ dataUrl }) });
       toast('画像を追加しました（保存すると公開されます）');
