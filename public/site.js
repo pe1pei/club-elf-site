@@ -21,7 +21,7 @@
   };
   // 画像: サーバー保存分（uploads/…）と、お試しモードでブラウザ内に持つ data:image を許可
   // サイト同梱の画像（logo-horizontal.png など）も相対パスのまま使う
-  const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) || /^[\w-]+\.(png|jpe?g|webp|gif)$/i.test(u) ? u : safeUrl(u));
+  const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) || /^[\w-]+\.(png|jpe?g|webp|gif|svg)$/i.test(u) ? u : safeUrl(u));
   // 写真未登録のキャストは店のロゴ画像を出す
   const NO_PHOTO = 'no-photo.jpg';
   const photoImg = (c, alt, lazy) => c.photo
