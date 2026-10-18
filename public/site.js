@@ -511,6 +511,14 @@
     }
   });
   addEventListener('scroll', onScroll, { passive: true });
+  // ロゴ画像が読めなかったときは、空枠ではなく店名の文字で出す
+  app.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img.tagName !== 'IMG' || !img.closest('.hero-logo')) return;
+    const h1 = img.closest('h1');
+    h1.classList.remove('hero-logo');
+    h1.textContent = img.alt;
+  }, true);
   app.addEventListener('pointerdown', (e) => { if (e.target.closest('.cf-stage')) cfDrag = { x: e.clientX, y: e.clientY }; });
   addEventListener('pointerup', (e) => {
     if (!cfDrag) return;
