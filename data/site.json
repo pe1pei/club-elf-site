@@ -191,7 +191,7 @@
     }
   ],
   "shift": {
-    "enabled": true,
+    "enabled": false,
     "defaultTime": "20:00〜",
     "dayStart": 6
   },

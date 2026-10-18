@@ -40,7 +40,7 @@
   const addDays = (k, n) => { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
   const todayKey = (s) => keyOf(new Date(Date.now() - (Number(s.shift?.dayStart) || 0) * 3600e3));
   const dayLabel = (k) => { const d = parseKey(k); return { md: `${d.getMonth() + 1}/${d.getDate()}`, dow: DOW[d.getDay()], w: d.getDay() }; };
-  const shiftOn = (s) => s.shift?.enabled !== false;
+  const shiftOn = (s) => s.shift?.enabled === true; // 明示的に ON にしたときだけ出勤情報を出す
   const shiftOf = (s, key, id) => s.shifts?.[key]?.[id] || '';
 
   const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;

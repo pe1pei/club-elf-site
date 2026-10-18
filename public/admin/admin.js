@@ -116,7 +116,7 @@
     if (s.system.items) { s.system.plans = [{ title: '', items: s.system.items }]; delete s.system.items; }
     s.system.plans ||= [];
     s.system.plans.forEach((p) => { p.items ||= []; });
-    s.shift ||= { enabled: true, defaultTime: '20:00〜', dayStart: 6 };
+    s.shift ||= { enabled: false, defaultTime: '20:00〜', dayStart: 6 }; // 出勤情報は初期状態で非表示
     s.shifts ||= {};
     // 旧形式（キャストごとの today フラグ）を日付ベースの出勤表へ移す
     const tk = todayKeyOf(s);

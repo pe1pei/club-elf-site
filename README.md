@@ -74,3 +74,26 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
   タイトル・説明文・OGP（LINE / X の共有表示）・canonical・構造化データ（NightClub：住所・電話・価格帯）
 - `sitemap.xml` と `robots.txt` も自動で出ます。Google Search Console にサイトマップを登録してください。
 - 見えない文字でキーワードを詰め込むのは Google の規約違反（順位低下・除外の対象）なので行いません。
+
+## さくらのレンタルサーバで本番運用する（PHP 版）
+
+さくらのレンタルサーバは Node.js の常駐が禁止なので、サーバー側を PHP にした版（`sakura/`）を使います。
+画面（公開ページ・管理画面）は同じものです。PHP 8.1 以上が必要です（コントロールパネルで選択）。
+
+1. **管理パスワードを決める**（入力は表示されず、`data/config.json` にハッシュだけ保存されます）
+   ```
+   node tools/set-password.js
+   ```
+2. **アップロード用フォルダを作る** → `dist-sakura/` ができます
+   ```
+   node tools/build-sakura.js
+   ```
+3. `dist-sakura/` の**中身**を、ドメインの公開フォルダ（例: `/home/アカウント名/www/ドメイン名/`）にアップロード
+   （FTP / SFTP、またはコントロールパネルのファイルマネージャー。`.htaccess` などのドットファイルも忘れずに）
+4. コントロールパネルで **常時SSL化（https）** を有効にする
+5. `https://ドメイン/admin/` でログインし、SEO タブの「サイトのURL」を独自ドメインに変更して保存
+
+- 本番で入力したデータは `data/site.json`、写真は `uploads/` に保存されます。どちらも `dist-sakura` に含まれないので、**コードを更新して再アップロードしても上書きされません**（初回だけ `data/site.default.json` から自動作成）。
+- 保存のたびに `data/backups/` に直前の状態が30件まで残ります。
+- `data/`・`lib/`・`templates/` は `.htaccess` で外から見えません。`uploads/` は画像以外を返しません。
+- 手元での確認: `php -S localhost:3400 -t dist-sakura tools/php-router.php`

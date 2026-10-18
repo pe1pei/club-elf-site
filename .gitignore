@@ -4,3 +4,6 @@ public/uploads/*
 !public/uploads/.gitkeep
 _site/
 *.tmp
+
+dist-sakura/
+data/config.json

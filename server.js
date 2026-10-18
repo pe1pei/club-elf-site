@@ -66,6 +66,15 @@ function sameOrigin(req) {
 }
 
 function passwordOk(input) {
+  // tools/set-password.js で設定済みなら、PHP 版と同じ data/config.json のハッシュで照合する
+  const cfgFile = path.join(DATA_DIR, 'config.json');
+  if (fs.existsSync(cfgFile)) {
+    const p = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).password;
+    if (p && p.algo === 'pbkdf2-sha256') {
+      const calc = crypto.pbkdf2Sync(String(input), Buffer.from(p.salt, 'base64'), p.iter, 32, 'sha256');
+      return crypto.timingSafeEqual(calc, Buffer.from(p.hash, 'base64'));
+    }
+  }
   const a = crypto.createHash('sha256').update(String(input)).digest();
   const b = crypto.createHash('sha256').update(PASSWORD).digest();
   return crypto.timingSafeEqual(a, b);
