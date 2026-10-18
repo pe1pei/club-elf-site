@@ -16,9 +16,25 @@
     { id: 'branches', label: '支店', page: 'index', section: 'branches' },
     { id: 'sns', label: 'SNS', page: 'index', section: 'footer' },
     { id: 'seo', label: 'SEO', page: 'index', section: 'about' },
-    { id: 'theme', label: 'デザイン', page: 'index', section: 'top' },
+    { id: 'theme', label: 'デザイン', page: 'index', section: 'cast' },
   ];
   const SNS_TYPES = [['instagram', 'Instagram'], ['x', 'X'], ['tiktok', 'TikTok'], ['line', 'LINE'], ['youtube', 'YouTube'], ['web', 'その他URL']];
+  // キャストの見せ方。pic は選択カード用のミニ図（3枚のカードの位置）
+  const LAYOUTS = [
+    { id: 'coverflow', name: '重ねて中央を強調', desc: '少し重ねて並べ、真ん中が浮き上がる',
+      pic: [[-26, 6, 0, .78, .45], [26, 6, 0, .78, .45], [0, 0, 0, 1, 1]] },
+    { id: 'tilt', name: '3D回転', desc: '両隣が斜めに傾いて奥へ並ぶ',
+      pic: [[-30, 4, 0, .8, .45, 52], [30, 4, 0, .8, .45, -52], [0, 0, 0, 1, 1]] },
+    { id: 'fan', name: '扇形', desc: 'トランプのように広げる',
+      pic: [[-14, 6, -16, .92, .55], [14, 6, 16, .92, .55], [0, -2, 0, 1, 1]] },
+    { id: 'strip', name: '横スクロール', desc: '大きめの写真を指で横に流す',
+      pic: [[-34, 0, 0, .9, 1], [0, 0, 0, .9, 1], [34, 0, 0, .9, 1]] },
+    { id: 'grid', name: '格子', desc: '全員を一覧で見せる', grid: true },
+  ];
+  const layoutPic = (l) => l.grid
+    ? `<span class="lp lp-grid">${'<i></i>'.repeat(6)}</span>`
+    : `<span class="lp">${l.pic.map(([x, y, r, s, o, ry = 0]) => `<i style="transform:translateX(${x}px) translateY(${y}px) rotate(${r}deg) perspective(80px) rotateY(${ry}deg) scale(${s});opacity:${o}"></i>`).join('')}</span>`;
+
   const PRESETS = [
     { name: 'ゴールド × ブラック', accent: '#c9a35a', bg: '#0c0a0f' },
     { name: 'ローズ × ブラック', accent: '#d68aa5', bg: '#110a0e' },
@@ -93,6 +109,8 @@
     s.hero ||= {}; s.hero.images ||= [];
     s.casts ||= []; s.branches ||= []; s.sns ||= [];
     s.theme ||= { accent: '#c9a35a', bg: '#0c0a0f' };
+    s.theme.castLayout ||= 'coverflow';
+    if (s.theme.castAutoplay === undefined) s.theme.castAutoplay = true;
     s.seo ||= {}; s.seo.keywords ||= [];
     s.system ||= {};
     if (s.system.items) { s.system.plans = [{ title: '', items: s.system.items }]; delete s.system.items; }
@@ -484,6 +502,10 @@
     theme() {
       const t = site.theme;
       return `
+        <h3>キャストの見せ方</h3>
+        <div class="layouts">${LAYOUTS.map((l) => `<button class="layout ${t.castLayout === l.id ? 'on' : ''}" data-act="layout" data-layout="${l.id}">
+          ${layoutPic(l)}<b>${l.name}</b><small>${l.desc}</small></button>`).join('')}</div>
+        ${['coverflow', 'tilt', 'fan'].includes(t.castLayout) ? `<div class="bar">${sw('theme.castAutoplay', '自動で回す（約4.5秒ごと）')}</div>` : ''}
         <h3>カラープリセット</h3>
         <div class="presets">${PRESETS.map((p, i) => `<button class="preset ${p.accent === t.accent && p.bg === t.bg ? 'on' : ''}" data-act="preset" data-i="${i}">
           <i style="background:${p.bg};border-color:${p.accent}"></i><span>${p.name}</span></button>`).join('')}</div>
@@ -644,6 +666,10 @@
       site.sns.push({ type: b.dataset.type, url: '' });
       changed({ rerender: true });
       return panel.querySelector(`[data-path="sns.${site.sns.length - 1}.url"]`)?.focus();
+    }
+    if (act === 'layout') {
+      site.theme.castLayout = b.dataset.layout;
+      return changed({ rerender: true });
     }
     if (act === 'preset') {
       const p = PRESETS[i];

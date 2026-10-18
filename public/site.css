@@ -217,3 +217,34 @@ svg { width: 1em; height: 1em; flex: none; }
 .about .sec-title small { display: block; margin-top: 6px; font-size: 14px; letter-spacing: .2em; color: var(--fg); }
 .about-text { font-size: 15px; line-height: 2.2; color: color-mix(in srgb, var(--fg) 85%, transparent); text-align: center; }
 @media (max-width: 600px) { .about-text { text-align: left; } }
+
+/* ---------- キャストの見せ方：カルーセル系（coverflow / tilt / fan） ---------- */
+.cf { --cfw: clamp(170px, 50vw, 290px); position: relative; overflow: hidden; margin: 0 calc(-1 * var(--gutter)); padding: 8px 0; outline: none; }
+.cf:focus-visible { outline: 1px solid var(--line); }
+.cf-stage { position: relative; height: calc(var(--cfw) * 4 / 3 + 56px); perspective: 1400px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.cf-item { all: unset; position: absolute; left: 50%; top: 28px; width: var(--cfw); cursor: pointer;
+  transition: transform .7s cubic-bezier(.2, .8, .2, 1), filter .7s, opacity .5s; will-change: transform; }
+.cf-item .ph { border-color: var(--line); box-shadow: 0 18px 40px -18px #000; }
+.cf-item.on .ph { border-color: var(--accent); box-shadow: 0 26px 60px -14px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 1px var(--accent); }
+.cf-item img { -webkit-user-drag: none; pointer-events: none; }
+.cf-fan .cf-item { transform-origin: 50% 130%; }
+.cf-fan .cf-stage { height: calc(var(--cfw) * 4 / 3 + 150px); } /* 傾いた外側の写真の下端が切れないように */
+.cf-nav { position: absolute; top: calc(var(--cfw) * 2 / 3 + 20px); z-index: 200; width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid var(--accent); background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--accent);
+  font-size: 26px; line-height: 1; cursor: pointer; backdrop-filter: blur(6px); transition: background .2s, color .2s; }
+.cf-nav:hover { background: var(--accent); color: var(--bg); }
+.cf-nav.prev { left: max(12px, calc(50% - var(--cfw) * 1.35)); }
+.cf-nav.next { right: max(12px, calc(50% - var(--cfw) * 1.35)); }
+.cf-caption { text-align: center; min-height: 120px; margin-top: 4px; }
+.cf-count { font-family: var(--latin); color: var(--muted); letter-spacing: .3em; font-size: 12px; }
+.cf-caption .nm { font-size: 22px; letter-spacing: .25em; margin-top: 2px; }
+.cf-caption .pf { color: var(--muted); font-size: 13px; }
+.cf-more { margin-top: 12px; font: inherit; font-family: var(--latin); letter-spacing: .25em; font-size: 13px; background: none; color: var(--accent);
+  border: 1px solid var(--line); padding: 7px 22px; cursor: pointer; transition: .2s; }
+.cf-more:hover { background: var(--accent); color: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .cf-item { transition: none; } }
+
+/* ---------- 横スクロール ---------- */
+.cast-strip { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px var(--gutter) 18px;
+  margin: 0 calc(-1 * var(--gutter)); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.cast-strip .cast { flex: 0 0 clamp(200px, 62vw, 280px); scroll-snap-align: center; }

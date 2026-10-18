@@ -284,7 +284,9 @@
   },
   "theme": {
     "accent": "#c9a35a",
-    "bg": "#0c0a0f"
+    "bg": "#0c0a0f",
+    "castLayout": "coverflow",
+    "castAutoplay": true
   },
   "seo": {
     "siteUrl": "https://pe1pei.github.io/club-elf-site/",

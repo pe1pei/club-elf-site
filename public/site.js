@@ -135,32 +135,120 @@
     </section>`;
   }
 
-  function castHTML(s) {
+  function castList(s) {
     const casts = (s.casts || []).filter((c) => c.visible !== false);
     const on = shiftOn(s);
     const tk = todayKey(s);
     const today = on ? casts.filter((c) => shiftOf(s, tk, c.id)) : [];
     if (!on) castFilter = 'all';
-    const list = castFilter === 'today' ? today : casts;
+    return { casts, today, on, tk, list: castFilter === 'today' ? today : casts };
+  }
+
+  function castHTML(s) {
+    const { casts, today, on, tk, list } = castList(s);
+    const layout = s.theme?.castLayout || 'coverflow';
+    const badge = (c) => (on && shiftOf(s, tk, c.id) ? `<span class="badge">本日出勤 ${esc(shiftOf(s, tk, c.id))}</span>` : '');
+    let body;
+    if (!list.length) {
+      body = `<p class="empty">${castFilter === 'today' ? '本日の出勤情報は準備中です' : 'キャスト情報は準備中です'}</p>`;
+    } else if (layout === 'grid' || layout === 'strip') {
+      // 格子 / 横スクロール（CSS だけで並べる）
+      body = `<div class="${layout === 'grid' ? 'cast-grid' : 'cast-strip'}">${list.map((c) => `
+        <button class="cast" data-id="${esc(c.id)}">
+          <div class="ph">${photoImg(c, c.name, true)}${badge(c)}</div>
+          <p class="nm">${esc(c.name)}</p>
+          ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
+          ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
+        </button>`).join('')}</div>`;
+    } else {
+      // カルーセル系（coverflow / tilt / fan）：中央の1枚を強調。位置は layoutCF() が JS で付ける
+      body = `<div class="cf cf-${esc(layout)}" data-mode="${esc(layout)}" tabindex="0" aria-roledescription="カルーセル" aria-label="キャスト紹介（左右キーで切り替え）">
+        <div class="cf-stage">${list.map((c, i) => `
+          <button class="cf-item" data-i="${i}" data-id="${esc(c.id)}" aria-label="${esc(c.name)}">
+            <div class="ph">${photoImg(c, c.name, i > 4)}${badge(c)}</div>
+          </button>`).join('')}</div>
+        ${list.length > 1 ? '<button class="cf-nav prev" data-cf="-1" aria-label="前のキャスト">‹</button><button class="cf-nav next" data-cf="1" aria-label="次のキャスト">›</button>' : ''}
+      </div>
+      <div class="cf-caption" aria-live="polite"></div>`;
+    }
     return `<section class="sec" id="cast">
       ${title('CAST', 'キャスト紹介')}
       ${on ? `<div class="filter" role="tablist">
         <button data-f="all" class="${castFilter === 'all' ? 'on' : ''}">ALL <small>${casts.length}</small></button>
         <button data-f="today" class="${castFilter === 'today' ? 'on' : ''}">本日出勤 <small>${today.length}</small></button>
       </div>` : ''}
-      ${list.length ? `<div class="cast-grid">${list.map((c) => `
-        <button class="cast" data-id="${esc(c.id)}">
-          <div class="ph">
-            ${photoImg(c, c.name, true)}
-            ${on && shiftOf(s, tk, c.id) ? `<span class="badge">本日出勤 ${esc(shiftOf(s, tk, c.id))}</span>` : ''}
-          </div>
-          <p class="nm">${esc(c.name)}</p>
-          ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
-          ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
-        </button>`).join('')}</div>`
-        : `<p class="empty">${castFilter === 'today' ? '本日の出勤情報は準備中です' : 'キャスト情報は準備中です'}</p>`}
+      ${body}
     </section>`;
   }
+
+  // ---------- カバーフロー ----------
+  let cfIndex = 0;
+  let cfTimer = null;
+  let cfHover = false;
+  let cfDrag = null;      // スワイプ中の開始位置
+  let cfSwiped = 0;       // スワイプ直後のクリックを無視するための時刻
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  function layoutCF() {
+    const items = app.querySelectorAll('.cf-item');
+    const n = items.length;
+    if (!n) return;
+    cfIndex = ((cfIndex % n) + n) % n;
+    const w = items[0].offsetWidth;
+    const gap = w * (innerWidth < 600 ? 0.42 : 0.55); // カード幅より狭くずらして重ねる
+    const mode = app.querySelector('.cf').dataset.mode;
+    items.forEach((el, i) => {
+      let d = i - cfIndex;
+      if (n > 2) { if (d > n / 2) d -= n; if (d < -n / 2) d += n; } // 端から端へ回り込む
+      const a = Math.abs(d);
+      el.style.transform = cfTransform(mode, d, a, gap);
+      el.style.zIndex = String(100 - a);
+      el.style.opacity = a > 3 ? '0' : '1';
+      el.style.filter = a === 0 ? 'none' : `brightness(${Math.max(0.3, 0.62 - (a - 1) * 0.12)}) saturate(.8)`;
+      el.style.pointerEvents = a > 3 ? 'none' : '';
+      el.classList.toggle('on', a === 0);
+      el.tabIndex = -1;
+      el.setAttribute('aria-hidden', a === 0 ? 'false' : 'true');
+    });
+    const c = (site.casts || []).find((x) => x.id === items[cfIndex].dataset.id);
+    const cap = app.querySelector('.cf-caption');
+    if (c && cap) {
+      cap.innerHTML = `<p class="cf-count">${cfIndex + 1} / ${n}</p>
+        <p class="nm">${esc(c.name)}</p>
+        ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
+        ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
+        <button class="cf-more" data-open="${esc(c.id)}">PROFILE <span aria-hidden="true">→</span></button>`;
+    }
+  }
+
+  // d: 中央からの位置（左が負）、a: その絶対値、gap: 隣とのずらし幅
+  function cfTransform(mode, d, a, gap) {
+    const base = 'translateX(-50%) ';
+    if (mode === 'tilt') {
+      // 3D回転：両隣を斜めに傾けて奥へ
+      const x = a === 0 ? 0 : Math.sign(d) * (gap * 0.55 + a * gap * 0.38);
+      return base + `translateX(${x}px) translateZ(${a === 0 ? 40 : -140 - a * 30}px) rotateY(${a === 0 ? 0 : -Math.sign(d) * 48}deg)`;
+    }
+    if (mode === 'fan') {
+      // 扇形：下端を軸にトランプのように広げる
+      return base + `translateX(${d * gap * 0.32}px) translateY(${a === 0 ? -18 : a * 6}px) rotate(${d * 9}deg) scale(${a === 0 ? 1 : 0.92})`;
+    }
+    // coverflow：重ねて中央を浮かせる
+    const scale = a === 0 ? 1 : Math.max(0.58, 0.84 - (a - 1) * 0.1);
+    return base + `translateX(${d * gap}px) translateY(${a === 0 ? -12 : 0}px) scale(${scale})`;
+  }
+
+  function cfGo(step) { cfIndex += step; layoutCF(); restartCF(); }
+
+  function restartCF() {
+    clearInterval(cfTimer);
+    if (!site || site.theme?.castAutoplay === false || reduceMotion.matches) return;
+    if (app.querySelectorAll('.cf-item').length < 2) return;
+    cfTimer = setInterval(() => {
+      if (!cfHover && !document.hidden && !document.querySelector('dialog[open]')) { cfIndex += 1; layoutCF(); }
+    }, 4500);
+  }
+
 
   function scheduleHTML(s) {
     if (!shiftOn(s)) return '';
@@ -332,7 +420,8 @@
       patch('callbar', callBarHTML(ap.phone, '電話で応募する'));
     } else {
       if (patch('hero', heroHTML(s))) startSlides(s.hero?.interval);
-      patch('cast', castHTML(s));
+      if (patch('cast', castHTML(s))) layoutCF();
+      restartCF(); // 自動再生の ON/OFF 変更も反映
       patch('schedule', scheduleHTML(s));
       patch('about', aboutHTML(s));
       patch('info', infoHTML(s));
@@ -388,7 +477,18 @@
 
   app.addEventListener('click', (e) => {
     const f = e.target.closest('[data-f]');
-    if (f) { castFilter = f.dataset.f; patch('cast', castHTML(site)); return; }
+    if (f) { castFilter = f.dataset.f; cfIndex = 0; if (patch('cast', castHTML(site))) { layoutCF(); restartCF(); } return; }
+    const nav = e.target.closest('[data-cf]');
+    if (nav) { cfGo(Number(nav.dataset.cf)); return; }
+    const more = e.target.closest('[data-open]');
+    if (more) { openCast(more.dataset.open); return; }
+    const cf = e.target.closest('.cf-item');
+    if (cf) {
+      if (Date.now() - cfSwiped < 300) return; // スワイプの指離しでクリック扱いにしない
+      const i = Number(cf.dataset.i);
+      if (i === cfIndex) openCast(cf.dataset.id); else { cfIndex = i; layoutCF(); restartCF(); }
+      return;
+    }
     const j = e.target.closest('[data-job]');
     if (j) { job = j.dataset.job; history.replaceState(null, '', PREVIEW ? location.search + '#' + job : '#' + job); patch('recruit', recruitHTML(site)); return; }
     const day = e.target.closest('[data-day]');
@@ -408,6 +508,23 @@
     }
   });
   addEventListener('scroll', onScroll, { passive: true });
+  app.addEventListener('pointerdown', (e) => { if (e.target.closest('.cf-stage')) cfDrag = { x: e.clientX, y: e.clientY }; });
+  addEventListener('pointerup', (e) => {
+    if (!cfDrag) return;
+    const dx = e.clientX - cfDrag.x, dy = e.clientY - cfDrag.y;
+    cfDrag = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { cfSwiped = Date.now(); cfGo(dx < 0 ? 1 : -1); }
+  });
+  app.addEventListener('keydown', (e) => {
+    if (!e.target.closest('.cf')) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); cfGo(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); cfGo(-1); }
+    if (e.key === 'Enter' && e.target.classList.contains('cf')) { const on = app.querySelector('.cf-item.on'); if (on) openCast(on.dataset.id); }
+  });
+  app.addEventListener('pointerover', (e) => { cfHover = !!e.target.closest('.cf'); });
+  app.addEventListener('pointerleave', () => { cfHover = false; });
+  let resizeT;
+  addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(layoutCF, 120); });
   addEventListener('hashchange', () => {
     if (PAGE === 'recruit' && site && ['#cast', '#staff'].includes(location.hash)) { job = location.hash.slice(1); patch('recruit', recruitHTML(site)); }
   });
