@@ -7,6 +7,20 @@ require __DIR__ . '/lib/seo.php';
 $p = (string) ($_GET['p'] ?? 'index');
 if (!in_array($p, ['index', 'recruit', 'admin', 'sitemap', 'robots'], true)) $p = 'index';
 
+// http や www・初期ドメイン（○○.sakura.ne.jp）で来たら、SEO タブの「サイトのURL」へ 301 転送して1つにまとめる。
+// API（保存など）は転送しない。手元確認（localhost）も対象外。
+(function (array $site): void {
+    $u = trim((string) ($site['seo']['siteUrl'] ?? ''));
+    $want = parse_url($u);
+    if ($u === '' || str_contains($u, 'github.io') || empty($want['host'])) return;
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if (preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host)) return;
+    $wantHttps = ($want['scheme'] ?? 'https') === 'https';
+    if ($host === strtolower($want['host']) && is_https() === $wantHttps) return;
+    header('Location: ' . ($wantHttps ? 'https' : 'http') . '://' . $want['host'] . ($_SERVER['REQUEST_URI'] ?? '/'), true, 301);
+    exit;
+})(load_site());
+
 if ($p === 'sitemap' || $p === 'robots') {
     header('Content-Type: ' . ($p === 'sitemap' ? 'application/xml' : 'text/plain') . '; charset=utf-8');
     echo $p === 'sitemap' ? sitemap(load_site()) : robots(load_site());
