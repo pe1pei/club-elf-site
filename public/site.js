@@ -155,7 +155,7 @@
     return `<section class="hero" id="top">
       <div class="slides">${imgs.length
         ? imgs.map((src, i) => `<div class="slide${i ? '' : ' on'}" style="background-image:url('${cssUrl(src)}')"></div>`).join('')
-        : '<div class="slide ph on"></div>'}</div>
+        : '<div class="slide slide-ph on"></div>'}</div>
       <div class="hero-shade"></div>
       <div class="hero-text">
         ${s.shop.kana ? `<p class="hero-kana">${esc(s.shop.kana)}</p>` : ''}

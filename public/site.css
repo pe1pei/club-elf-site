@@ -33,21 +33,22 @@ svg { width: 1em; height: 1em; flex: none; }
 }
 
 /* hero */
-.hero { position: relative; height: 100svh; min-height: 540px; overflow: hidden; display: grid; place-items: center; text-align: center; }
+.hero { position: relative; min-height: max(100svh, 540px); overflow: hidden; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 72px; }
 .slides, .slide, .hero-shade { position: absolute; inset: 0; }
 .slide { background: center / cover no-repeat; opacity: 0; transform: scale(1.06); transition: opacity 1.8s ease, transform 8s ease; }
 .slide.on { opacity: 1; transform: scale(1); }
-.slide.ph { background:
+.slide-ph { background:
   radial-gradient(ellipse at 25% 20%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 55%),
   radial-gradient(ellipse at 80% 85%, color-mix(in srgb, #8a2050 35%, transparent), transparent 60%),
   var(--bg); }
 .hero-shade { background: linear-gradient(180deg, #0008, #0000 30%, #0000 55%, var(--bg)); }
-.hero-text { position: relative; padding: 0 16px; text-shadow: 0 2px 24px #000a; }
+.hero-text { position: relative; padding: 0 16px; margin: auto 0; text-shadow: 0 2px 24px #000a; }
 .hero-kana { font-size: 13px; letter-spacing: .5em; color: var(--accent); }
 .hero h1 { font-family: var(--latin); font-weight: 500; font-size: clamp(46px, 11vw, 112px); letter-spacing: .12em; line-height: 1.1; margin: .15em 0 .3em; }
 .hero-catch { font-size: clamp(16px, 2.4vw, 22px); letter-spacing: .3em; }
 .hero-sub { color: var(--muted); font-size: 14px; margin-top: 10px; }
-.scroll-cue { position: absolute; bottom: 28px; left: 50%; translate: -50% 0; font-family: var(--latin); font-size: 12px; letter-spacing: .4em; color: var(--muted); padding-bottom: 44px; }
+/* SCROLL の飾りは文章の下に並べる（画面下に固定すると、低い画面で文章と重なっていた） */
+.scroll-cue { position: relative; flex: none; margin: 28px 0 24px; font-family: var(--latin); font-size: 12px; letter-spacing: .4em; color: var(--muted); padding-bottom: 44px; }
 .scroll-cue::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 36px; background: linear-gradient(var(--accent), transparent); animation: cue 2s infinite; }
 @keyframes cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
 
@@ -208,6 +209,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .call-bar { display: none; }
 @media (max-width: 820px) {
   body { padding-bottom: 64px; }
+  .scroll-cue { display: none; } /* 画面下の電話バーに隠れて線だけはみ出すため、スマホでは出さない */
   .call-bar { display: flex; position: fixed; inset: auto 0 0; z-index: 30; height: 60px; align-items: center; justify-content: center; gap: 10px; background: var(--accent); color: var(--bg); font-size: 16px; letter-spacing: .12em; font-weight: 600; }
   .call-bar svg { font-size: 20px; }
 }
