@@ -216,60 +216,83 @@
   }
 
   // ---------- カバーフロー ----------
+  // 位置は小数で持てるようにして、スワイプ中は指に合わせて連続的に動かす（cfPos）。離したら最寄りの1枚に吸着する。
   let cfIndex = 0;
   let cfTimer = null;
   let cfHover = false;
-  let cfDrag = null;      // スワイプ中の開始位置
+  let cfDrag = null;      // スワイプ中の状態
   let cfSwiped = 0;       // スワイプ直後のクリックを無視するための時刻
+  let cfCaptionId = '';   // 表示中のキャプション（変わったときだけふわっと出す）
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-  function layoutCF() {
+  // 1枚ぶん進むのに必要な指の移動量（px）。モードごとのずらし幅に合わせる
+  function cfStep(mode, gap) {
+    if (mode === 'fan') return gap * 0.6;
+    if (mode === 'tilt') return gap * 0.8;
+    return gap;
+  }
+  function cfGap(items) { return items[0].offsetWidth * (innerWidth < 600 ? 0.42 : 0.55); }
+
+  function layoutCF(pos = cfIndex) {
     const items = app.querySelectorAll('.cf-item');
     const n = items.length;
     if (!n) return;
-    cfIndex = ((cfIndex % n) + n) % n;
-    const w = items[0].offsetWidth;
-    const gap = w * (innerWidth < 600 ? 0.42 : 0.55); // カード幅より狭くずらして重ねる
+    const dragging = pos !== cfIndex;
+    if (!dragging) { cfIndex = ((cfIndex % n) + n) % n; pos = cfIndex; }
+    const gap = cfGap(items);
     const mode = app.querySelector('.cf').dataset.mode;
+    const center = ((Math.round(pos) % n) + n) % n;
     items.forEach((el, i) => {
-      let d = i - cfIndex;
-      if (n > 2) { if (d > n / 2) d -= n; if (d < -n / 2) d += n; } // 端から端へ回り込む
+      let d = i - pos;
+      if (n > 2) d -= n * Math.round(d / n); // 端から端へ回り込む
       const a = Math.abs(d);
-      el.style.transform = cfTransform(mode, d, a, gap);
-      el.style.zIndex = String(100 - a);
-      el.style.opacity = a > 3 ? '0' : '1';
-      el.style.filter = a === 0 ? 'none' : `brightness(${Math.max(0.3, 0.62 - (a - 1) * 0.12)}) saturate(.8)`;
+      const near = Math.min(a, 1); // 0（中央）〜1（隣）
+      el.style.transform = cfTransform(mode, d, a, near, gap);
+      el.style.zIndex = String(1000 - Math.round(a * 100));
+      el.style.opacity = a > 3.5 ? '0' : a > 3 ? String((3.5 - a) * 2) : '1';
+      const bright = a < 1 ? 1 - near * 0.38 : Math.max(0.3, 0.62 - (a - 1) * 0.12);
+      el.style.filter = bright >= 0.999 ? 'none' : `brightness(${bright.toFixed(3)}) saturate(${(1 - near * 0.2).toFixed(3)})`;
       el.style.pointerEvents = a > 3 ? 'none' : '';
-      el.classList.toggle('on', a === 0);
       el.tabIndex = -1;
-      el.setAttribute('aria-hidden', a === 0 ? 'false' : 'true');
+      if (!dragging) {
+        el.classList.toggle('on', i === center); // on が付いた瞬間に「ふわっ」と出るアニメーションが走る
+        el.setAttribute('aria-hidden', i === center ? 'false' : 'true');
+      }
     });
-    const c = (site.casts || []).find((x) => x.id === items[cfIndex].dataset.id);
+    if (dragging) return;
+    const c = (site.casts || []).find((x) => x.id === items[center].dataset.id);
     const cap = app.querySelector('.cf-caption');
     if (c && cap) {
-      cap.innerHTML = `<p class="cf-count">${cfIndex + 1} / ${n}</p>
+      cap.innerHTML = `<p class="cf-count">${center + 1} / ${n}</p>
         <p class="nm">${esc(c.name)}</p>
         ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
         ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
         <button class="cf-more" data-open="${esc(c.id)}">PROFILE <span aria-hidden="true">→</span></button>`;
+      if (cfCaptionId !== c.id) {
+        cfCaptionId = c.id;
+        cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap'); // アニメーションをかけ直す
+      }
     }
   }
 
-  // d: 中央からの位置（左が負）、a: その絶対値、gap: 隣とのずらし幅
-  function cfTransform(mode, d, a, gap) {
+  // d: 中央からの位置（左が負・小数あり）、a: その絶対値、near: 0〜1 に丸めた a、gap: 隣とのずらし幅
+  function cfTransform(mode, d, a, near, gap) {
     const base = 'translateX(-50%) ';
+    const s = Math.sign(d);
     if (mode === 'tilt') {
       // 3D回転：両隣を斜めに傾けて奥へ
-      const x = a === 0 ? 0 : Math.sign(d) * (gap * 0.55 + a * gap * 0.38);
-      return base + `translateX(${x}px) translateZ(${a === 0 ? 40 : -140 - a * 30}px) rotateY(${a === 0 ? 0 : -Math.sign(d) * 48}deg)`;
+      const x = d * gap * 0.38 + s * gap * 0.55 * near;
+      const z = a < 1 ? 40 - 210 * a : -140 - a * 30;
+      return base + `translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${(-s * 48 * near).toFixed(2)}deg)`;
     }
     if (mode === 'fan') {
       // 扇形：下端を軸にトランプのように広げる
-      return base + `translateX(${d * gap * 0.32}px) translateY(${a === 0 ? -18 : a * 6}px) rotate(${d * 9}deg) scale(${a === 0 ? 1 : 0.92})`;
+      const y = a < 1 ? -18 + 24 * a : a * 6;
+      return base + `translateX(${(d * gap * 0.32).toFixed(1)}px) translateY(${y.toFixed(1)}px) rotate(${(d * 9).toFixed(2)}deg) scale(${(1 - 0.08 * near).toFixed(3)})`;
     }
     // coverflow：重ねて中央を浮かせる
-    const scale = a === 0 ? 1 : Math.max(0.58, 0.84 - (a - 1) * 0.1);
-    return base + `translateX(${d * gap}px) translateY(${a === 0 ? -12 : 0}px) scale(${scale})`;
+    const scale = a < 1 ? 1 - 0.16 * a : Math.max(0.58, 0.84 - (a - 1) * 0.1);
+    return base + `translateX(${(d * gap).toFixed(1)}px) translateY(${(-12 * (1 - near)).toFixed(1)}px) scale(${scale.toFixed(3)})`;
   }
 
   function cfGo(step) { cfIndex += step; layoutCF(); restartCF(); }
@@ -279,7 +302,7 @@
     if (!site || site.theme?.castAutoplay === false || reduceMotion.matches) return;
     if (app.querySelectorAll('.cf-item').length < 2) return;
     cfTimer = setInterval(() => {
-      if (!cfHover && !document.hidden && !document.querySelector('dialog[open]')) { cfIndex += 1; layoutCF(); }
+      if (!cfHover && !cfDrag && !document.hidden && !document.querySelector('dialog[open]')) { cfIndex += 1; layoutCF(); }
     }, 4500);
   }
 
@@ -550,20 +573,54 @@
     h1.classList.remove('hero-logo');
     h1.textContent = img.alt;
   }, true);
-  app.addEventListener('pointerdown', (e) => { if (e.target.closest('.cf-stage')) cfDrag = { x: e.clientX, y: e.clientY }; });
-  addEventListener('pointerup', (e) => {
+  // スワイプ：指（マウス）の動きに合わせて連続で動かし、離したら勢いを見て最寄りの1枚に吸着
+  app.addEventListener('pointerdown', (e) => {
+    const stage = e.target.closest('.cf-stage');
+    if (!stage || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const items = app.querySelectorAll('.cf-item');
+    if (items.length < 2) return;
+    const mode = app.querySelector('.cf').dataset.mode;
+    cfDrag = { x: e.clientX, y: e.clientY, pos0: cfIndex, pos: cfIndex, step: cfStep(mode, cfGap(items)), moved: false, lastX: e.clientX, lastT: performance.now(), v: 0 };
+  });
+  addEventListener('pointermove', (e) => {
     if (!cfDrag) return;
     const dx = e.clientX - cfDrag.x, dy = e.clientY - cfDrag.y;
-    cfDrag = null;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { cfSwiped = Date.now(); cfGo(dx < 0 ? 1 : -1); }
+    if (!cfDrag.moved) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { cfDrag = null; return; } // 縦スクロールは邪魔しない
+      if (Math.abs(dx) < 6) return;
+      cfDrag.moved = true;
+      app.querySelector('.cf')?.classList.add('cf-dragging'); // 指に追従させるあいだはアニメーションを止める
+    }
+    const now = performance.now();
+    const dt = Math.max(1, now - cfDrag.lastT);
+    cfDrag.v = 0.8 * ((e.clientX - cfDrag.lastX) / dt) + 0.2 * cfDrag.v; // px/ms（なめらかにした速度）
+    cfDrag.lastX = e.clientX; cfDrag.lastT = now;
+    cfDrag.pos = cfDrag.pos0 - dx / cfDrag.step;
+    layoutCF(cfDrag.pos === cfIndex ? cfDrag.pos + 1e-6 : cfDrag.pos);
   });
+  const endDrag = () => {
+    if (!cfDrag) return;
+    const d = cfDrag;
+    cfDrag = null;
+    if (!d.moved) return; // ただのタップはクリック処理に任せる
+    app.querySelector('.cf')?.classList.remove('cf-dragging');
+    const fling = -(d.v * 180) / d.step;                          // 払った勢いのぶん先へ
+    const jump = Math.max(-4, Math.min(4, Math.round(d.pos + fling - d.pos0)));
+    cfIndex = d.pos0 + jump;
+    cfSwiped = Date.now();
+    layoutCF();
+    restartCF();
+  };
+  addEventListener('pointerup', endDrag);
+  addEventListener('pointercancel', endDrag);
   app.addEventListener('keydown', (e) => {
     if (!e.target.closest('.cf')) return;
     if (e.key === 'ArrowRight') { e.preventDefault(); cfGo(1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); cfGo(-1); }
     if (e.key === 'Enter' && e.target.classList.contains('cf')) { const on = app.querySelector('.cf-item.on'); if (on) openCast(on.dataset.id); }
   });
-  app.addEventListener('pointerover', (e) => { cfHover = !!e.target.closest('.cf'); });
+  // マウスを乗せている間だけ自動再生を止める（スマホのタッチでは止めっぱなしにならないように）
+  app.addEventListener('pointerover', (e) => { if (e.pointerType === 'mouse') cfHover = !!e.target.closest('.cf'); });
   app.addEventListener('pointerleave', () => { cfHover = false; });
   let resizeT;
   addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(layoutCF, 120); });
