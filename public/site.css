@@ -143,7 +143,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .price div::after { content: none; }
 .price dt { flex: 1; display: flex; align-items: baseline; gap: 12px; }
 .price dt::after { content: ""; flex: 1; border-bottom: 1px dotted color-mix(in srgb, var(--muted) 50%, transparent); translate: 0 -4px; }
-.price dd { font-family: var(--latin); font-size: 19px; color: var(--accent); text-align: right; }
+.price dd { font-family: var(--tel); font-size: 17px; font-weight: 600; color: var(--accent); text-align: right; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; } /* 金額は本文と同じ明朝体・等幅数字で桁をそろえる */
 .system .note { margin-top: 16px; }
 .plan + .plan { margin-top: 36px; }
 .plan-title { text-align: center; font-size: 15px; letter-spacing: .2em; padding: 6px 0; border: 1px solid var(--line); margin-bottom: 4px; }
