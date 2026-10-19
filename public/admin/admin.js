@@ -130,7 +130,7 @@
       s.recruit[k].items ||= []; s.recruit[k].perks ||= [];
     }
     s.recruit.apply ||= {};
-    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; if (c.visible === undefined) c.visible = true; }
+    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; c.sns ||= {}; if (c.visible === undefined) c.visible = true; }
     return s;
   }
   const getPath = (p) => p.split('.').reduce((o, k) => o?.[k], site);
@@ -347,11 +347,12 @@
           <button class="btn primary" data-act="cast-add">＋ キャストを追加</button>
         </div>
         <p class="sum">サイト掲載 <b>${visible.length}</b>人 ／ 在籍 ${site.casts.length}人</p>
-        <p class="hint">名前を押すと詳細を編集できます。並び順がそのままサイトの掲載順です。出勤の入力は「出勤」タブで。</p>
-        <ul class="list">${site.casts.map((c, i) => {
+        <p class="hint">名前を押すと詳細を編集できます。左の <b>⠿</b> をつかんで上下に動かすと並べ替えられます（この順がサイトの掲載順）。出勤の入力は「出勤」タブで。</p>
+        <ul class="list" data-sortable="casts">${site.casts.map((c, i) => {
           const open = openItems.has(c.id);
           return `<li class="item ${c.visible === false ? 'off' : ''} ${open ? 'open' : ''}">
             <div class="row">
+              <span class="grip" data-grip="${i}" title="ドラッグで並べ替え" aria-label="ドラッグで並べ替え">⠿</span>
               <button class="thumb" data-act="cast-photo" data-i="${i}" title="写真を変更">${c.photo ? `<img src="${esc(imgSrc(c.photo))}" alt="">` : '写真'}</button>
               <button class="name" data-act="toggle" data-id="${esc(c.id)}">
                 <b data-label="casts.${i}.name">${esc(c.name) || '（名前未入力）'}</b>
@@ -372,6 +373,14 @@
               ${field('プロフィール', `casts.${i}.profile`, { ph: '例：T158 / O型' })}
               ${field('タグ', `casts.${i}.tags`, { ph: '例：新人、No.1', hint: '「、」区切りで複数', list: true })}
               ${field('ひとこと', `casts.${i}.comment`, { rows: 3 })}
+              <h4 class="mini">SNS <small>（名前の下にアイコンで出ます。URL でも @ID だけでもOK）</small></h4>
+              <div class="grid2">
+                ${field('Instagram', `casts.${i}.sns.instagram`, { ph: '@ID または URL' })}
+                ${field('TikTok', `casts.${i}.sns.tiktok`, { ph: '@ID または URL' })}
+                ${field('X（旧Twitter）', `casts.${i}.sns.x`, { ph: '@ID または URL' })}
+                ${field('LINE', `casts.${i}.sns.line`, { ph: 'LINE ID または URL' })}
+              </div>
+              ${field('その他のURL', `casts.${i}.sns.web`, { type: 'url', ph: 'ブログなど https://…' })}
               <div class="edit-foot">
                 ${sw(`casts.${i}.visible`, 'サイトに表示')}
                 ${delBtn('casts', i, 'このキャストを削除')}
@@ -549,6 +558,71 @@
     changed({ rerender: structural });
   });
 
+  // ---------- ドラッグ＆ドロップで並べ替え ----------
+  // マウスでも指でも動くよう Pointer Events で実装（HTML5 の drag はスマホで動かないため）。
+  // つまみ（⠿）をつかむ → 行が指についてくる → 他の行がよけて隙間ができる → 離した位置に入る
+  let sortDrag = null;
+  panel.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip) return;
+    const list = grip.closest('[data-sortable]');
+    const row = grip.closest('.item');
+    if (!list || !row) return;
+    e.preventDefault();
+    try { grip.setPointerCapture(e.pointerId); } catch { /* 取れなくても並べ替えは動く */ }
+    const rows = [...list.children];
+    const from = rows.indexOf(row);
+    const gapPx = parseFloat(getComputedStyle(list).rowGap) || 0;
+    sortDrag = {
+      list, row, rows, from, to: from, path: list.dataset.sortable,
+      startY: e.clientY, startScroll: panel.scrollTop, lastY: e.clientY,
+      shift: row.offsetHeight + gapPx,
+      mids: rows.map((r) => r.offsetTop + r.offsetHeight / 2),
+      top: row.offsetTop, h: row.offsetHeight,
+    };
+    row.classList.add('dragging');
+    list.classList.add('sorting');
+  });
+  function sortMove(clientY) {
+    const d = sortDrag;
+    const dy = clientY - d.startY + (panel.scrollTop - d.startScroll);
+    d.row.style.transform = `translateY(${dy}px)`;
+    const center = d.top + d.h / 2 + dy;
+    let to = d.mids.filter((m, i) => i !== d.from && m < center).length;
+    d.to = to;
+    d.rows.forEach((r, i) => {
+      if (i === d.from) return;
+      let s = 0;
+      if (d.from < to && i > d.from && i <= to) s = -d.shift;   // 下へ動かしたとき：間の行を上へ
+      if (d.from > to && i >= to && i < d.from) s = d.shift;    // 上へ動かしたとき：間の行を下へ
+      r.style.transform = s ? `translateY(${s}px)` : '';
+    });
+  }
+  panel.addEventListener('pointermove', (e) => {
+    if (!sortDrag) return;
+    sortDrag.lastY = e.clientY;
+    sortMove(e.clientY);
+    // 一覧の端に来たら自動でスクロール
+    const pr = panel.getBoundingClientRect();
+    if (e.clientY < pr.top + 50) panel.scrollTop -= 14;
+    else if (e.clientY > pr.bottom - 50) panel.scrollTop += 14;
+  });
+  panel.addEventListener('scroll', () => { if (sortDrag) sortMove(sortDrag.lastY); });
+  const sortEnd = () => {
+    if (!sortDrag) return;
+    const { path, from, to, rows, list } = sortDrag;
+    sortDrag = null;
+    rows.forEach((r) => { r.style.transform = ''; r.classList.remove('dragging'); });
+    list.classList.remove('sorting');
+    if (from === to) return;
+    const arr = getPath(path);
+    arr.splice(to, 0, arr.splice(from, 1)[0]);
+    changed({ rerender: true });
+    toast('並び順を変更しました（保存すると公開されます）');
+  };
+  panel.addEventListener('pointerup', sortEnd);
+  panel.addEventListener('pointercancel', sortEnd);
+
   panel.addEventListener('click', async (e) => {
     const sub = e.target.closest('[data-sub]');
     if (sub) { recruitSub = sub.dataset.sub; renderPanel(); syncPreview(); return; }
@@ -645,7 +719,7 @@
       return panel.querySelectorAll('input')[panel.querySelectorAll('input').length - 1]?.focus();
     }
     if (act === 'cast-add') {
-      const c = { id: uid(), name: '', profile: '', tags: ['新人'], comment: '', photo: '', visible: true };
+      const c = { id: uid(), name: '', profile: '', tags: ['新人'], comment: '', photo: '', sns: {}, visible: true };
       site.casts.unshift(c);
       openItems.add(c.id);
       changed({ rerender: true });

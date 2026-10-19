@@ -90,6 +90,27 @@
   };
   const SNS_LABEL = { instagram: 'Instagram', x: 'X', tiktok: 'TikTok', line: 'LINE', youtube: 'YouTube', web: 'Web' };
 
+  // キャストごとの SNS。管理画面では URL でも「@ID」だけでも入れられるので、ID は各 SNS の URL に直す
+  const CAST_SNS = ['instagram', 'tiktok', 'x', 'line', 'web'];
+  function castSnsUrl(type, v) {
+    v = String(v || '').trim();
+    if (!v) return '';
+    if (/^https?:\/\//i.test(v)) return v;
+    const id = v.replace(/^@/, '');
+    if (/^[\w.~-]+$/.test(id)) {
+      if (type === 'instagram') return `https://www.instagram.com/${id}/`;
+      if (type === 'tiktok') return `https://www.tiktok.com/@${id}`;
+      if (type === 'x') return `https://x.com/${id}`;
+      if (type === 'line' && !id.includes('.')) return `https://line.me/ti/p/~${id}`;
+    }
+    return safeUrl(v);
+  }
+  function castSns(c) {
+    const links = CAST_SNS.map((t) => [t, castSnsUrl(t, c.sns?.[t])]).filter(([, u]) => u);
+    if (!links.length) return '';
+    return `<div class="cast-sns">${links.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener" aria-label="${esc(c.name)} の ${SNS_LABEL[t]}">${ICON[t]}</a>`).join('')}</div>`;
+  }
+
   // 各パーツは HTML が変わったときだけ差し替える（地図の再読込やスライドのリセットを防ぐ）
   function patch(name, html) {
     const el = app.querySelector(`[data-part="${name}"]`);
@@ -188,12 +209,15 @@
     } else if (layout === 'grid' || layout === 'strip') {
       // 格子 / 横スクロール（CSS だけで並べる）
       body = `<div class="${layout === 'grid' ? 'cast-grid' : 'cast-strip'}">${list.map((c) => `
-        <button class="cast" data-id="${esc(c.id)}">
-          <div class="ph">${photoImg(c, c.name, true)}${badge(c)}</div>
-          <p class="nm">${esc(c.name)}</p>
+        <div class="cast-card">
+          <button class="cast" data-id="${esc(c.id)}">
+            <div class="ph">${photoImg(c, c.name, true)}${badge(c)}</div>
+            <p class="nm">${esc(c.name)}</p>
+          </button>
+          ${castSns(c)}
           ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
           ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
-        </button>`).join('')}</div>`;
+        </div>`).join('')}</div>`;
     } else {
       // カルーセル系（coverflow / tilt / fan）：中央の1枚を強調。位置は layoutCF() が JS で付ける
       body = `<div class="cf cf-${esc(layout)}" data-mode="${esc(layout)}" tabindex="0" aria-roledescription="カルーセル" aria-label="キャスト紹介（左右キーで切り替え）">
@@ -265,6 +289,7 @@
     if (c && cap) {
       cap.innerHTML = `<p class="cf-count">${center + 1} / ${n}</p>
         <p class="nm">${esc(c.name)}</p>
+        ${castSns(c)}
         ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
         ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
         <button class="cf-more" data-open="${esc(c.id)}">PROFILE <span aria-hidden="true">→</span></button>`;
@@ -515,6 +540,7 @@
       <div class="modal-body">
         ${on && shiftOf(site, tk, c.id) ? `<span class="badge static">本日出勤 ${esc(shiftOf(site, tk, c.id))}</span>` : ''}
         <h3>${esc(c.name)}</h3>
+        ${castSns(c)}
         ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
         ${(c.tags || []).length ? `<p class="tags left">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
         ${c.comment ? `<p class="comment">${nl(c.comment)}</p>` : ''}

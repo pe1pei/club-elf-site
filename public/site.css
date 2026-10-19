@@ -7,6 +7,7 @@
   --line: color-mix(in srgb, var(--accent) 32%, transparent);
   --serif: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --latin: "Cormorant Garamond", var(--serif);
+  --tel: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; /* 電話番号は普通のフォントで */
   --gutter: clamp(16px, 4vw, 40px);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,14 +19,14 @@ ul { list-style: none; }
 svg { width: 1em; height: 1em; flex: none; }
 
 /* header */
-.hd { position: fixed; inset: 0 0 auto; z-index: 20; display: flex; align-items: center; gap: 28px; padding: 14px var(--gutter); transition: background .3s, border-color .3s; border-bottom: 1px solid transparent; }
+.hd { position: fixed; inset: 0 0 auto; z-index: 500; display: flex; align-items: center; gap: 28px; padding: 14px var(--gutter); transition: background .3s, border-color .3s; border-bottom: 1px solid transparent; }
 .hd.solid { background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-color: var(--line); }
 .logo { font-family: var(--latin); font-size: 22px; font-weight: 500; letter-spacing: .2em; color: var(--accent); margin-right: auto; white-space: nowrap; }
 .hd nav { display: flex; gap: 24px; font-family: var(--latin); font-size: 15px; letter-spacing: .2em; }
 .hd nav a { transition: color .2s; }
 .hd nav a:hover { color: var(--accent); }
-.hd-tel { display: flex; align-items: center; gap: 8px; border: 1px solid var(--accent); color: var(--accent); padding: 6px 14px; font-family: var(--latin); font-size: 16px; letter-spacing: .1em; }
-.hd-tel svg { font-size: 16px; }
+.hd-tel { display: flex; align-items: center; gap: 8px; border: 1px solid var(--accent); color: var(--fg); padding: 6px 14px; font-family: var(--tel); font-size: 15px; letter-spacing: .04em; font-variant-numeric: lining-nums tabular-nums; }
+.hd-tel svg { font-size: 16px; color: var(--accent); }
 @media (max-width: 820px) {
   .hd nav { display: none; }
   .hd-tel span { display: none; }
@@ -71,7 +72,8 @@ svg { width: 1em; height: 1em; flex: none; }
 .cast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: clamp(14px, 2.4vw, 32px); }
 @media (max-width: 520px) { .cast-grid { grid-template-columns: repeat(2, 1fr); } }
 /* button は中身を縦中央に寄せるので、タグの有無で高さが違うと写真位置がずれる → 上詰めにする */
-.cast { all: unset; cursor: pointer; display: block; text-align: center; align-self: start; }
+.cast-card { text-align: center; align-self: start; min-width: 0; }
+.cast { all: unset; cursor: pointer; display: block; width: 100%; text-align: center; }
 .ph, .modal-ph { position: relative; aspect-ratio: 3 / 4; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
 .ph img, .modal-ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .7s ease; }
 .cast:hover .ph img { transform: scale(1.05); }
@@ -80,7 +82,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .badge { position: absolute; top: 8px; left: 8px; background: var(--accent); color: var(--bg); font-size: 11px; padding: 2px 9px; letter-spacing: .1em; line-height: 1.7; }
 .badge.static { position: static; display: inline-block; margin-bottom: 10px; }
 .cast .nm { margin-top: 12px; font-size: 17px; letter-spacing: .2em; }
-.cast .pf { font-size: 12px; color: var(--muted); }
+.cast-card .pf { font-size: 12px; color: var(--muted); }
 .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 6px; }
 .tags.left { justify-content: flex-start; }
 .tags span { font-size: 11px; border: 1px solid var(--line); color: var(--accent); padding: 0 8px; }
@@ -131,7 +133,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .info-item > svg { font-size: 26px; color: var(--accent); margin: 0 auto; display: block; }
 .info-item h3 { font-family: var(--latin); font-weight: 400; letter-spacing: .3em; font-size: 14px; color: var(--muted); margin: 8px 0 4px; }
 .info-item p { font-size: 18px; }
-.tel-big { font-family: var(--latin); font-size: 30px; color: var(--accent); letter-spacing: .08em; }
+.tel-big { font-family: var(--tel); font-size: 26px; font-weight: 500; color: var(--fg); letter-spacing: .03em; font-variant-numeric: lining-nums tabular-nums; }
 .note { text-align: center; color: var(--muted); margin-top: 28px; font-size: 14px; }
 
 .system { max-width: 640px; margin: 64px auto 0; }
@@ -188,7 +190,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .apply-btns a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 220px; padding: 14px 24px; font-size: 16px; letter-spacing: .08em; }
 .apply-btns svg { font-size: 20px; }
 .btn-line { background: #06c755; color: #fff; }
-.btn-gold { background: var(--accent); color: var(--bg); font-family: var(--latin); font-size: 19px !important; }
+.btn-gold { background: var(--accent); color: var(--bg); font-family: var(--tel); font-size: 18px !important; font-weight: 600; letter-spacing: .03em; font-variant-numeric: lining-nums tabular-nums; }
 .btn-outline { border: 1px solid var(--accent); color: var(--accent); }
 @media (max-width: 520px) { .apply-btns a { width: 100%; } }
 
@@ -210,7 +212,7 @@ svg { width: 1em; height: 1em; flex: none; }
 @media (max-width: 820px) {
   body { padding-bottom: 64px; }
   .scroll-cue { display: none; } /* 画面下の電話バーに隠れて線だけはみ出すため、スマホでは出さない */
-  .call-bar { display: flex; position: fixed; inset: auto 0 0; z-index: 30; height: 60px; align-items: center; justify-content: center; gap: 10px; background: var(--accent); color: var(--bg); font-size: 16px; letter-spacing: .12em; font-weight: 600; }
+  .call-bar { display: flex; position: fixed; inset: auto 0 0; z-index: 500; height: 60px; align-items: center; justify-content: center; gap: 10px; background: var(--accent); color: var(--bg); font-size: 16px; letter-spacing: .12em; font-weight: 600; }
   .call-bar svg { font-size: 20px; }
 }
 
@@ -272,7 +274,7 @@ svg { width: 1em; height: 1em; flex: none; }
 /* ---------- 横スクロール ---------- */
 .cast-strip { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px var(--gutter) 18px;
   margin: 0 calc(-1 * var(--gutter)); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-.cast-strip .cast { flex: 0 0 clamp(200px, 62vw, 280px); scroll-snap-align: center; }
+.cast-strip .cast-card { flex: 0 0 clamp(200px, 62vw, 280px); scroll-snap-align: center; }
 
 /* トップのロゴ画像（店名の代わり） */
 .hero-logo { margin: .25em 0 .4em; line-height: 0; }
@@ -282,3 +284,11 @@ svg { width: 1em; height: 1em; flex: none; }
 body { word-break: keep-all; overflow-wrap: anywhere; line-break: strict; }
 p, dd, small { text-wrap: pretty; }
 .hero-catch, .job-catch, .sec-title small { text-wrap: balance; }
+
+/* キャストの SNS アイコン（名前の下）。指で押しやすい 40px 角 */
+.cast-sns { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.cast-sns a { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); color: var(--accent); transition: background .2s, color .2s, transform .2s; }
+.cast-sns a:hover, .cast-sns a:focus-visible { background: var(--accent); color: var(--bg); transform: translateY(-2px); }
+.cast-sns svg { width: 19px; height: 19px; }
+.modal-body .cast-sns { justify-content: flex-start; margin: 10px 0 6px; }
+@media (max-width: 520px) { .cast-grid .cast-sns { gap: 6px; } .cast-grid .cast-sns a { width: 36px; height: 36px; } }
