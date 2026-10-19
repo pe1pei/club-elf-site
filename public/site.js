@@ -11,11 +11,15 @@
   let slideTimer = null;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  // 日本語の折り返し：単語の区切りにだけ <wbr> を入れ、CSS（word-break: keep-all）で単語の途中では改行させない。
-  // 区切りはブラウザ標準の Intl.Segmenter（iPhone/Android とも対応）。細かく切れすぎるので次は前後とくっつける：
-  // 助詞・語尾（で／ます）、句読点・閉じ括弧、開き括弧の次、数字＋単位、1文字の漢字（静岡＋県、日＋払い）、接頭の「お／ご」は次の語へ。
+  // ---------- 日本語の折り返し ----------
+  // 単語の区切りにだけ <wbr> を入れ、CSS（word-break: keep-all）で単語の途中では改行させない。
+  // 描画後のページ全体の文字に自動でかけるので、どの欄の文章でも同じルールになる（wrapJa）。
+  // 区切りはブラウザ標準の Intl.Segmenter（iPhone/Android とも対応）。細かく切れすぎるので次は前後とつなげる：
+  //  助詞・語尾（で／ます）、句読点・閉じ括弧、開き括弧の次、1文字の漢字（静岡＋県、日＋払い）、
+  //  複合動詞（立ち＋寄る）、接頭の「お／ご」は次の語へ、数字・英字は隣の文字と（歩いて3分、一番町11-14、第二KOHWAビル）
   const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
   const KANJI = /[㐀-鿿]/;
+  const ALNUM = /[0-9A-Za-z０-９Ａ-Ｚａ-ｚ]/;
   function jpChunks(s) {
     const out = [];
     let prefix = '';
@@ -24,25 +28,48 @@
       segment = prefix + segment;
       prefix = '';
       const prev = out[out.length - 1];
+      const last = prev === undefined ? '' : prev.slice(-1);
       const glue = prev !== undefined && (
-        /^[ぁ-ゟ]{1,3}$/.test(segment)
-        || /^[、。，．！？!?）」』】・…ー〜\s]+$/.test(segment)
-        || /[「『（【(]$/.test(prev)
-        || (/[0-9０-９]$/.test(prev) && /^[0-9０-９,，.%％円分時人名日週月年回件歳]/.test(segment))
-        || (segment.length === 1 && KANJI.test(segment) && KANJI.test(prev.slice(-1)))
-        || (/^[㐀-鿿][ぁ-ゟ]$/.test(prev) && KANJI.test(segment[0])) // 立ち＋寄り、落ち＋着いた
-        || (prev.length === 1 && KANJI.test(prev) && /[3400-9fff0-9０-９]/.test(segment[0]))
+        /^[ぁ-ゟ]{1,3}$/.test(segment)                                 // 助詞・語尾
+        || /^[、。，．！？!?）」』】・…ー〜:：%％\s]+$/.test(segment)          // 句読点・閉じ括弧・空白（ノーブレークスペース含む）
+        || /[「『（【(\u00a0]$/.test(prev)                                     // 開き括弧の次
+        || (segment.length === 1 && KANJI.test(segment) && KANJI.test(last))   // 静岡＋県
+        || (prev.length === 1 && KANJI.test(prev) && (KANJI.test(segment[0]) || ALNUM.test(segment[0]))) // 日＋払い、週＋1日
+        || (/^[㐀-鿿][ぁ-ゟ]$/.test(prev) && KANJI.test(segment[0])) // 立ち＋寄り
+        || (ALNUM.test(segment[0]) && last !== '' && !/\s/.test(last))         // 歩いて＋3分、一番町＋11-14
+        || (ALNUM.test(last) && !/^\s/.test(segment))                          // 3＋分、KOHWA＋ビル、OK＋です
       );
       if (glue) out[out.length - 1] += segment; else out.push(segment);
     }
     if (prefix) out.push(prefix);
     return out;
   }
-  const jp = (s) => {
-    s = String(s ?? '');
-    return segmenter ? jpChunks(s).map(esc).join('<wbr>') : esc(s);
-  };
-  const nl = (s) => String(s ?? '').split('\n').map(jp).join('<br>');
+  // 「1SET 60分 4,000円」や「ビル B1」「2F」のような短い英数字の前後の空白は改行させない（ノーブレークスペースに）
+  const keepNumbers = (s) => s
+    .replace(/([0-9A-Za-z%％円分])[ ](?=[0-9A-Za-z¥￥])/g, '$1\u00a0')
+    .replace(/[ ](?=[0-9A-Za-z]{1,3}(?:[\s／/]|$))/g, '\u00a0');
+  function wrapJa(root) {
+    if (!segmenter || !root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        if (n.data.length < 4 || !/[぀-ヿ㐀-鿿]/.test(n.data)) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        return !p || p.closest('script, style, svg, textarea, input') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const n of nodes) {
+      const chunks = jpChunks(keepNumbers(n.data));
+      if (chunks.length < 2 && !n.data.includes(' ')) continue;
+      const frag = document.createDocumentFragment();
+      chunks.forEach((c, i) => { if (i) frag.append(document.createElement('wbr')); frag.append(c); });
+      n.replaceWith(frag);
+    }
+  }
+  // 文章は描画後に wrapJa で区切るので、ここではエスケープと改行だけ
+  const jp = (s) => esc(s);
+  const nl = (s) => String(s ?? '').split('\n').map(esc).join('<br>');
   const safeUrl = (u) => {
     u = String(u ?? '').trim();
     if (!u) return '';
@@ -114,7 +141,7 @@
   // 各パーツは HTML が変わったときだけ差し替える（地図の再読込やスライドのリセットを防ぐ）
   function patch(name, html) {
     const el = app.querySelector(`[data-part="${name}"]`);
-    if (el && el._html !== html) { el.innerHTML = html; el._html = html; return true; }
+    if (el && el._html !== html) { el.innerHTML = html; el._html = html; wrapJa(el); return true; }
     return false;
   }
 
@@ -293,6 +320,7 @@
         ${c.profile ? `<p class="pf">${esc(c.profile)}</p>` : ''}
         ${(c.tags || []).length ? `<p class="tags">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</p>` : ''}
         <button class="cf-more" data-open="${esc(c.id)}">PROFILE <span aria-hidden="true">→</span></button>`;
+      wrapJa(cap);
       if (cfCaptionId !== c.id) {
         cfCaptionId = c.id;
         cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap'); // アニメーションをかけ直す
@@ -550,6 +578,7 @@
         }).join('')}</ul>` : ''}
       </div>
     </div>`;
+    wrapJa(dlg);
     dlg.showModal();
   }
 

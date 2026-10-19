@@ -139,9 +139,10 @@ svg { width: 1em; height: 1em; flex: none; }
 .system { max-width: 640px; margin: 64px auto 0; }
 .sub-title { text-align: center; font-family: var(--latin); font-weight: 400; font-size: 26px; letter-spacing: .3em; color: var(--accent); margin-bottom: 20px; }
 .sub-title small { display: block; font-family: var(--serif); font-size: 12px; letter-spacing: .3em; color: var(--muted); }
-.price div { display: flex; align-items: baseline; gap: 12px; padding: 13px 4px; border-bottom: 1px solid var(--line); }
+.price div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 13px 4px; border-bottom: 1px solid var(--line); }
 .price div::after { content: none; }
-.price dt { flex: 1; display: flex; align-items: baseline; gap: 12px; }
+.price dt { flex: 1 1 auto; display: flex; align-items: baseline; gap: 12px; white-space: nowrap; } /* 項目名は途中で折らない。入りきらなければ金額が次の行へ */
+.price dd { margin-left: auto; }
 .price dt::after { content: ""; flex: 1; border-bottom: 1px dotted color-mix(in srgb, var(--muted) 50%, transparent); translate: 0 -4px; }
 .price dd { font-family: var(--tel); font-size: 17px; font-weight: 600; color: var(--accent); text-align: right; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; } /* 金額は本文と同じ明朝体・等幅数字で桁をそろえる */
 .system .note { margin-top: 16px; }
