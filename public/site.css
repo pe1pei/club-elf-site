@@ -7,7 +7,7 @@
   --line: color-mix(in srgb, var(--accent) 32%, transparent);
   --serif: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --latin: "Cormorant Garamond", var(--serif);
-  --tel: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; /* 電話番号は普通のフォントで */
+  --tel: var(--serif); /* 電話番号は本文と同じ明朝体（数字の高さがそろう） */
   --gutter: clamp(16px, 4vw, 40px);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -133,7 +133,7 @@ svg { width: 1em; height: 1em; flex: none; }
 .info-item > svg { font-size: 26px; color: var(--accent); margin: 0 auto; display: block; }
 .info-item h3 { font-family: var(--latin); font-weight: 400; letter-spacing: .3em; font-size: 14px; color: var(--muted); margin: 8px 0 4px; }
 .info-item p { font-size: 18px; }
-.tel-big { font-family: var(--tel); font-size: 26px; font-weight: 500; color: var(--fg); letter-spacing: .03em; font-variant-numeric: lining-nums tabular-nums; }
+.tel-big { font-family: var(--tel); font-size: 28px; font-weight: 600; color: var(--fg); letter-spacing: .03em; font-variant-numeric: lining-nums tabular-nums; }
 .note { text-align: center; color: var(--muted); margin-top: 28px; font-size: 14px; }
 
 .system { max-width: 640px; margin: 64px auto 0; }
