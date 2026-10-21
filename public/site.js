@@ -117,7 +117,7 @@
   };
   const SNS_LABEL = { instagram: 'Instagram', x: 'X', tiktok: 'TikTok', line: 'LINE', youtube: 'YouTube', web: 'Web' };
 
-  // キャストごとの SNS。管理画面では URL でも「@ID」だけでも入れられるので、ID は各 SNS の URL に直す
+  // SNS のリンク（お店の SNS・キャストの SNS 共通）。管理画面では URL でも「@ID」だけでも入れられるので、ID は各 SNS の URL に直す
   const CAST_SNS = ['instagram', 'tiktok', 'x', 'line', 'web'];
   function castSnsUrl(type, v) {
     v = String(v || '').trim();
@@ -129,8 +129,9 @@
       if (type === 'tiktok') return `https://www.tiktok.com/@${id}`;
       if (type === 'x') return `https://x.com/${id}`;
       if (type === 'line' && !id.includes('.')) return `https://line.me/ti/p/~${id}`;
+      if (type === 'youtube') return `https://www.youtube.com/@${id}`;
     }
-    return safeUrl(v);
+    return /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v) ? 'https://' + v : ''; // example.com/… の形なら https:// を補う。それ以外はリンクにしない
   }
   function castSns(c) {
     const links = CAST_SNS.map((t) => [t, castSnsUrl(t, c.sns?.[t])]).filter(([, u]) => u);
@@ -178,9 +179,9 @@
   }
 
   function footerHTML(s) {
-    const sns = (s.sns || []).filter((x) => safeUrl(x.url));
+    const sns = (s.sns || []).map((x) => ({ ...x, href: castSnsUrl(x.type, x.url) })).filter((x) => x.href);
     return `<footer class="ft" id="footer">
-      ${sns.length ? `<p class="ft-follow">FOLLOW US</p><ul class="sns">${sns.map((x) => `<li><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener" aria-label="${esc(SNS_LABEL[x.type] || 'Link')}">${ICON[x.type] || ICON.web}<span>${esc(SNS_LABEL[x.type] || 'Link')}</span></a></li>`).join('')}</ul>` : ''}
+      ${sns.length ? `<p class="ft-follow">FOLLOW US</p><ul class="sns">${sns.map((x) => `<li><a href="${esc(x.href)}" target="_blank" rel="noopener" aria-label="${esc(SNS_LABEL[x.type] || 'Link')}">${ICON[x.type] || ICON.web}<span>${esc(SNS_LABEL[x.type] || 'Link')}</span></a></li>`).join('')}</ul>` : ''}
       <p class="ft-name">${esc(s.shop.name)}</p>
       <p class="ft-addr">${esc(s.shop.address)}${s.shop.phone ? ` ／ TEL ${esc(s.shop.phone)}` : ''}</p>
       ${recruitOn(s).length && PAGE === 'index' ? '<p class="ft-links"><a href="recruit.html">求人情報</a></p>' : ''}

@@ -228,6 +228,34 @@
   }
   const delBtn = (list, i, label = '削除') => `<button class="btn danger sm" data-act="del" data-list="${list}" data-i="${i}">${label}</button>`;
 
+  // ---------- SNS：ID だけでも URL に直す（公開ページ site.js と同じ規則） ----------
+  function snsUrl(type, v) {
+    v = String(v || '').trim();
+    if (!v) return '';
+    if (/^https?:\/\//i.test(v)) return v;
+    const id = v.replace(/^@/, '');
+    if (/^[\w.~-]+$/.test(id)) {
+      const u = {
+        instagram: `https://www.instagram.com/${id}/`, tiktok: `https://www.tiktok.com/@${id}`, x: `https://x.com/${id}`,
+        youtube: `https://www.youtube.com/@${id}`, line: id.includes('.') ? '' : `https://line.me/ti/p/~${id}`,
+      }[type];
+      if (u) return u;
+    }
+    return /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v) ? 'https://' + v : ''; // example.com/… の形なら https:// を補う
+  }
+  const SNS_PH = { instagram: '@ID または URL', tiktok: '@ID または URL', x: '@ID または URL', youtube: '@ハンドル または URL', line: 'LINE ID または URL', web: 'https://…' };
+  // 入力欄の下に、実際に飛ぶ先を表示（打ち間違いにすぐ気づけるように）
+  function refreshResolved() {
+    panel.querySelectorAll('.resolved').forEach((el) => {
+      const type = el.dataset.rtypeFixed || getPath(el.dataset.rtype);
+      const val = String(getPath(el.dataset.rval) || '').trim();
+      const url = snsUrl(type, val);
+      el.classList.toggle('bad', !!val && !url);
+      el.innerHTML = !val ? '' : url ? `→ <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>` : 'このままではリンクになりません。ID か URL を確認してください';
+    });
+  }
+  const resolved = (rval, typePath, fixedType) => `<small class="resolved" data-rval="${rval}" ${fixedType ? `data-rtype-fixed="${fixedType}"` : `data-rtype="${typePath}"`}></small>`;
+
   // ---------- 各タブ ----------
   const dayInfo = (k) => { const d = parseKey(k); return { md: `${d.getMonth() + 1}/${d.getDate()}`, dow: DOW[d.getDay()], w: d.getDay(), d: d.getDate() }; };
   const dayCls = (k, tk) => { const w = parseKey(k).getDay(); return (k === tk ? ' today' : '') + (w === 0 ? ' sun' : w === 6 ? ' sat' : ''); };
@@ -512,12 +540,12 @@
               ${field('ひとこと', `casts.${i}.comment`, { rows: 3 })}
               <h4 class="mini">SNS <small>（名前の下にアイコンで出ます。URL でも @ID だけでもOK）</small></h4>
               <div class="grid2">
-                ${field('Instagram', `casts.${i}.sns.instagram`, { ph: '@ID または URL' })}
-                ${field('TikTok', `casts.${i}.sns.tiktok`, { ph: '@ID または URL' })}
-                ${field('X（旧Twitter）', `casts.${i}.sns.x`, { ph: '@ID または URL' })}
-                ${field('LINE', `casts.${i}.sns.line`, { ph: 'LINE ID または URL' })}
+                ${field('Instagram', `casts.${i}.sns.instagram`, { ph: '@ID または URL', hint: resolved(`casts.${i}.sns.instagram`, '', 'instagram') })}
+                ${field('TikTok', `casts.${i}.sns.tiktok`, { ph: '@ID または URL', hint: resolved(`casts.${i}.sns.tiktok`, '', 'tiktok') })}
+                ${field('X（旧Twitter）', `casts.${i}.sns.x`, { ph: '@ID または URL', hint: resolved(`casts.${i}.sns.x`, '', 'x') })}
+                ${field('LINE', `casts.${i}.sns.line`, { ph: 'LINE ID または URL', hint: resolved(`casts.${i}.sns.line`, '', 'line') })}
               </div>
-              ${field('その他のURL', `casts.${i}.sns.web`, { type: 'url', ph: 'ブログなど https://…' })}
+              ${field('その他のURL', `casts.${i}.sns.web`, { ph: 'ブログなど https://…', hint: resolved(`casts.${i}.sns.web`, '', 'web') })}
               <div class="edit-foot">
                 ${sw(`casts.${i}.visible`, 'サイトに表示')}
                 ${delBtn('casts', i, 'このキャストを削除')}
@@ -616,13 +644,13 @@
     sns() {
       const s = site.sns;
       return `
-        <p class="hint">ページ最下部にアイコンで並びます。URL が空のものは表示されません。</p>
+        <p class="hint">ページ最下部にアイコンで並びます。<b>@ID だけ入れれば、URL は自動で補います</b>（例：Instagram に「@clubelf」）。空のものは表示されません。</p>
         ${s.map((x, i) => `<div class="inline">
           <select data-path="sns.${i}.type">${SNS_TYPES.map(([v, l]) => `<option value="${v}" ${x.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-          <input data-path="sns.${i}.url" value="${esc(x.url)}" placeholder="https://..." type="url">
+          <input data-path="sns.${i}.url" value="${esc(x.url)}" placeholder="${SNS_PH[x.type] || 'https://…'}" autocapitalize="off" spellcheck="false">
           ${ord('sns', i, s.length)}
           <button class="icon-btn" data-act="del" data-list="sns" data-i="${i}" data-now aria-label="削除">×</button>
-        </div>`).join('')}
+        </div>${resolved(`sns.${i}.url`, `sns.${i}.type`)}`).join('')}
         <h3>追加</h3>
         <div class="bar">${SNS_TYPES.map(([v, l]) => `<button class="btn sm" data-act="sns-add" data-type="${v}">＋ ${l}</button>`).join('')}</div>`;
     },
@@ -673,6 +701,7 @@
 
   function renderPanel() {
     panel.innerHTML = views[tab]();
+    refreshResolved();
   }
 
   // ---------- 入力 ----------
@@ -692,6 +721,10 @@
     panel.querySelectorAll(`[data-label="${path}"]`).forEach((n) => { n.textContent = v || n.dataset.empty || '（名前未入力）'; });
     panel.querySelectorAll(`[data-count="${path}"]`).forEach((n) => { n.textContent = [...String(v)].length; });
     if (el.type === 'color') el.nextElementSibling.nextElementSibling.textContent = v;
+    if (/(^sns\.|\.sns\.)/.test(path)) {
+      refreshResolved();
+      if (/^sns\.\d+\.type$/.test(path)) { const inp = panel.querySelector(`[data-path="${path.replace('.type', '.url')}"]`); if (inp) inp.placeholder = SNS_PH[v] || 'https://…'; }
+    }
     const structural = el.type === 'checkbox' || el.type === 'color';
     changed({ rerender: structural });
   });

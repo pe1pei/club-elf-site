@@ -40,6 +40,23 @@ function parse_address(string $addr): array {
     return $out;
 }
 
+// SNS の ID（@clubelf など）を URL に（公開ページの site.js と同じ規則）
+function sns_url(string $type, string $v): string {
+    $v = trim($v);
+    if ($v === '') return '';
+    if (preg_match('#^https?://#i', $v)) return $v;
+    $id = ltrim($v, '@');
+    if (!preg_match('/^[\w.~-]+$/', $id)) return '';
+    return match ($type) {
+        'instagram' => "https://www.instagram.com/$id/",
+        'tiktok' => "https://www.tiktok.com/@$id",
+        'x' => "https://x.com/$id",
+        'youtube' => "https://www.youtube.com/@$id",
+        'line' => str_contains($id, '.') ? '' : "https://line.me/ti/p/~$id",
+        default => '',
+    };
+}
+
 function recruit_on(array $site): bool {
     return !empty($site['recruit']['cast']['enabled']) || !empty($site['recruit']['staff']['enabled']);
 }
@@ -75,7 +92,7 @@ function build_head(array $site, string $page): string {
         '<link rel="icon" href="no-photo.jpg">',
     ]);
     if ($page !== 'recruit') {
-        $sameAs = array_values(array_filter(array_map(fn ($x) => trim((string) ($x['url'] ?? '')), $site['sns'] ?? []), fn ($u) => preg_match('#^https?://#', $u)));
+        $sameAs = array_values(array_filter(array_map(fn ($x) => sns_url((string) ($x['type'] ?? ''), (string) ($x['url'] ?? '')), $site['sns'] ?? [])));
         $ld = array_filter([
             '@context' => 'https://schema.org',
             '@type' => 'NightClub',

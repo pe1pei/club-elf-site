@@ -264,3 +264,10 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .taglinks li { display: grid; grid-template-columns: 8.5em 1fr auto; align-items: center; gap: 8px; font-size: 12px; }
 .taglinks code { font-size: 11px; background: #f6f5f3; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 520px) { .taglinks li { grid-template-columns: 1fr auto; } .taglinks li span { grid-column: 1 / -1; } }
+
+/* SNS：入力欄の下の「→ 実際のリンク」 */
+.resolved { display: block; font-size: 11px; color: var(--ok); margin: -2px 0 8px; word-break: break-all; }
+.resolved a { color: inherit; }
+.resolved.bad { color: var(--danger); }
+.inline + .resolved { margin: -2px 0 10px 126px; }
+@media (max-width: 520px) { .inline + .resolved { margin-left: 0; } }
