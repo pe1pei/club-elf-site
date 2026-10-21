@@ -12,7 +12,8 @@
 <div id="login" class="login" hidden>
   <form class="login-box" id="loginForm">
     <h1>管理画面</h1>
-    <label class="f"><span>パスワード</span><input type="password" name="password" autocomplete="current-password" required autofocus></label>
+    <label class="f"><span>ID</span><input type="text" name="id" autocomplete="username" autocapitalize="off" spellcheck="false" required autofocus></label>
+    <label class="f"><span>パスワード</span><input type="password" name="password" autocomplete="current-password" required></label>
     <p class="err" id="loginErr"></p>
     <button class="btn primary wide">ログイン</button>
   </form>
@@ -26,6 +27,7 @@
       <button class="btn ghost" id="discard" hidden>変更を破棄</button>
       <button class="btn primary" id="save" disabled title="Ctrl + S">保存して公開</button>
       <a class="btn ghost hide-sm" href="../" target="_blank" rel="noopener">公開ページ ↗</a>
+      <span class="who hide-sm" id="who"></span>
       <button class="btn ghost hide-sm" id="logout">ログアウト</button>
     </div>
   </header>

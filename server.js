@@ -19,7 +19,7 @@ const KEEP_BACKUPS = 30;
 
 for (const d of [BACKUP, UPLOADS]) fs.mkdirSync(d, { recursive: true });
 
-const sessions = new Map(); // sid -> 有効期限
+const sessions = new Map(); // sid -> { exp: 有効期限, uid: ユーザーID }
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -51,33 +51,60 @@ function sessionId(req) {
   return m && m[1];
 }
 
-function authed(req) {
-  const sid = sessionId(req);
-  const exp = sid && sessions.get(sid);
-  if (!exp || exp < Date.now()) { if (sid) sessions.delete(sid); return false; }
-  sessions.set(sid, Date.now() + SESSION_TTL);
-  return true;
-}
-
 // 他サイトからの書き込みリクエストを弾く（SameSite Cookie と二重の守り）
 function sameOrigin(req) {
   const o = req.headers.origin;
   return !o || o === `http://${req.headers.host}` || o === `https://${req.headers.host}`;
 }
 
-function passwordOk(input) {
-  // tools/set-password.js で設定済みなら、PHP 版と同じ data/config.json のハッシュで照合する
-  const cfgFile = path.join(DATA_DIR, 'config.json');
-  if (fs.existsSync(cfgFile)) {
-    const p = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).password;
-    if (p && p.algo === 'pbkdf2-sha256') {
-      const calc = crypto.pbkdf2Sync(String(input), Buffer.from(p.salt, 'base64'), p.iter, 32, 'sha256');
-      return crypto.timingSafeEqual(calc, Buffer.from(p.hash, 'base64'));
-    }
+// ---------- アカウント（ID ＋ パスワード）。PHP 版と同じ data/config.json を使う ----------
+// users: [{ id, role: admin|staff, password: PBKDF2 ハッシュ, created }]。旧形式（password だけ）は ID「admin」として読む。
+// config.json が無いとき（手元の開発用）は ID「admin」/ ADMIN_PASSWORD でログインできる。
+const CONFIG = path.join(DATA_DIR, 'config.json');
+const PW_ITER = 210000;
+function hashPw(pw) {
+  const salt = crypto.randomBytes(16);
+  return { algo: 'pbkdf2-sha256', iter: PW_ITER, salt: salt.toString('base64'), hash: crypto.pbkdf2Sync(pw, salt, PW_ITER, 32, 'sha256').toString('base64') };
+}
+function verifyPw(p, pw) {
+  if (!p || p.algo !== 'pbkdf2-sha256') { crypto.pbkdf2Sync(String(pw), 'dummy-salt-0000', PW_ITER, 32, 'sha256'); return false; }
+  const calc = crypto.pbkdf2Sync(String(pw), Buffer.from(p.salt, 'base64'), p.iter, 32, 'sha256');
+  return crypto.timingSafeEqual(calc, Buffer.from(p.hash, 'base64'));
+}
+let devUsers = null;
+function loadConfig() {
+  if (!fs.existsSync(CONFIG)) {
+    devUsers ||= [{ id: 'admin', role: 'admin', password: hashPw(PASSWORD), created: new Date().toISOString() }];
+    return { users: devUsers, dev: true };
   }
-  const a = crypto.createHash('sha256').update(String(input)).digest();
-  const b = crypto.createHash('sha256').update(PASSWORD).digest();
-  return crypto.timingSafeEqual(a, b);
+  const c = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
+  if (!Array.isArray(c.users) && c.password) {
+    c.users = [{ id: 'admin', role: 'admin', password: c.password, created: new Date().toISOString() }];
+    delete c.password;
+  }
+  c.users ||= [];
+  return c;
+}
+function saveConfig(c) {
+  delete c.dev;
+  fs.writeFileSync(CONFIG + '.tmp', JSON.stringify(c, null, 2));
+  fs.renameSync(CONFIG + '.tmp', CONFIG);
+}
+const userIndex = (c, id) => c.users.findIndex((u) => u.id.toLowerCase() === String(id).toLowerCase());
+const validId = (id) => /^[A-Za-z0-9_.@-]{3,32}$/.test(id);
+const validPw = (pw) => [...pw].length >= 8 && [...pw].length <= 128;
+const adminCount = (c) => c.users.filter((u) => u.role === 'admin').length;
+const publicUser = (u) => ({ id: u.id, role: u.role || 'staff', created: u.created || '' });
+
+function currentUser(req) {
+  const sid = sessionId(req);
+  const s = sid && sessions.get(sid);
+  if (!s || s.exp < Date.now()) { if (sid) sessions.delete(sid); return null; }
+  const c = loadConfig();
+  const i = userIndex(c, s.uid);
+  if (i < 0) return null;
+  s.exp = Date.now() + SESSION_TTL;
+  return c.users[i];
 }
 
 async function saveSite(site) {
@@ -98,24 +125,90 @@ async function api(req, res, url) {
     return json(res, 200, JSON.parse(await fsp.readFile(DATA, 'utf8')));
   }
   if (route === 'POST /api/login') {
-    const { password } = JSON.parse(await readBody(req, 10e3) || '{}');
-    if (!passwordOk(password || '')) {
+    const c = loadConfig();
+    const { id = '', password = '' } = JSON.parse(await readBody(req, 10e3) || '{}');
+    const i = userIndex(c, String(id).trim());
+    if (!verifyPw(i >= 0 ? c.users[i].password : null, password)) {
       await new Promise((r) => setTimeout(r, 800)); // 総当たり対策の遅延
-      return json(res, 401, { error: 'パスワードが違います' });
+      return json(res, 401, { error: 'ID またはパスワードが違います' });
     }
     const sid = crypto.randomBytes(24).toString('hex');
-    sessions.set(sid, Date.now() + SESSION_TTL);
-    return json(res, 200, { ok: true }, { 'Set-Cookie': `sid=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL / 1000}` });
+    sessions.set(sid, { exp: Date.now() + SESSION_TTL, uid: c.users[i].id });
+    return json(res, 200, { ok: true, user: publicUser(c.users[i]) }, { 'Set-Cookie': `sid=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL / 1000}` });
   }
   if (route === 'POST /api/logout') {
     sessions.delete(sessionId(req));
     return json(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
   }
 
-  if (!authed(req)) return json(res, 401, { error: 'ログインが必要です' });
+  const me = currentUser(req);
+  if (!me) return json(res, 401, { error: 'ログインが必要です' });
 
   if (route === 'GET /api/me') {
-    return json(res, 200, { ok: true, defaultPassword: PASSWORD === 'changeme' });
+    return json(res, 200, { ok: true, defaultPassword: !!loadConfig().dev && PASSWORD === 'changeme', user: publicUser(me) });
+  }
+  // 自分の ID・パスワードの変更（今のパスワードが必要）
+  if (route === 'POST /api/account') {
+    const b = JSON.parse(await readBody(req, 10e3) || '{}');
+    const c = loadConfig();
+    const i = userIndex(c, me.id);
+    if (!verifyPw(c.users[i].password, b.currentPassword || '')) {
+      await new Promise((r) => setTimeout(r, 800));
+      return json(res, 400, { error: '今のパスワードが違います' });
+    }
+    const newId = String(b.newId || '').trim();
+    const newPw = String(b.newPassword || '');
+    if (!newId && !newPw) return json(res, 400, { error: '変更する内容を入力してください' });
+    if (newId) {
+      if (!validId(newId)) return json(res, 400, { error: 'ID は半角英数字と _ . @ - で3〜32文字にしてください' });
+      const j = userIndex(c, newId);
+      if (j >= 0 && j !== i) return json(res, 400, { error: 'その ID はすでに使われています' });
+      c.users[i].id = newId;
+      sessions.get(sessionId(req)).uid = newId;
+    }
+    if (newPw) {
+      if (!validPw(newPw)) return json(res, 400, { error: 'パスワードは8文字以上にしてください' });
+      c.users[i].password = hashPw(newPw);
+    }
+    saveConfig(c);
+    return json(res, 200, { ok: true, user: publicUser(c.users[i]) });
+  }
+  // ユーザー管理（管理者だけ）
+  if (url.pathname.startsWith('/api/users')) {
+    if (me.role !== 'admin') return json(res, 403, { error: 'この操作は管理者だけができます' });
+    const c = loadConfig();
+    const list = () => c.users.map(publicUser);
+    if (route === 'GET /api/users') return json(res, 200, { users: list() });
+    const b = JSON.parse(await readBody(req, 10e3) || '{}');
+    const id = String(b.id || '').trim();
+    const role = ['admin', 'staff'].includes(b.role) ? b.role : null;
+    if (route === 'POST /api/users') {
+      if (!validId(id)) return json(res, 400, { error: 'ID は半角英数字と _ . @ - で3〜32文字にしてください' });
+      if (userIndex(c, id) >= 0) return json(res, 400, { error: 'その ID はすでに使われています' });
+      if (!validPw(String(b.password || ''))) return json(res, 400, { error: 'パスワードは8文字以上にしてください' });
+      c.users.push({ id, role: role || 'staff', password: hashPw(String(b.password)), created: new Date().toISOString() });
+      saveConfig(c);
+      return json(res, 200, { ok: true, users: list() });
+    }
+    const i = userIndex(c, id);
+    if (i < 0) return json(res, 404, { error: 'そのユーザーは見つかりません' });
+    if (route === 'POST /api/users/update') {
+      if (role && role !== 'admin' && c.users[i].role === 'admin' && adminCount(c) <= 1) return json(res, 400, { error: '管理者が1人もいなくなるため変更できません' });
+      if (role) c.users[i].role = role;
+      if (b.password) {
+        if (!validPw(String(b.password))) return json(res, 400, { error: 'パスワードは8文字以上にしてください' });
+        c.users[i].password = hashPw(String(b.password));
+      }
+      saveConfig(c);
+      return json(res, 200, { ok: true, users: list() });
+    }
+    if (route === 'POST /api/users/delete') {
+      if (c.users[i].id.toLowerCase() === me.id.toLowerCase()) return json(res, 400, { error: '自分自身は削除できません' });
+      if (c.users[i].role === 'admin' && adminCount(c) <= 1) return json(res, 400, { error: '最後の管理者は削除できません' });
+      c.users.splice(i, 1);
+      saveConfig(c);
+      return json(res, 200, { ok: true, users: list() });
+    }
   }
   if (route === 'PUT /api/site') {
     const site = JSON.parse(await readBody(req, 2e6));

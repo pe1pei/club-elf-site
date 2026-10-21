@@ -3,23 +3,29 @@
 declare(strict_types=1);
 require __DIR__ . '/../lib/common.php';
 
-$route = ($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' ' . trim((string) ($_GET['r'] ?? ''), '/');
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && !same_origin()) json_out(403, ['error' => '不正なリクエストです']);
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$route = $method . ' ' . trim((string) ($_GET['r'] ?? ''), '/');
+if ($method !== 'GET' && !same_origin()) json_out(403, ['error' => '不正なリクエストです']);
 
 if ($route === 'GET site') json_out(200, load_site());
 
 start_session();
 
 if ($route === 'POST login') {
-    if (!password_config()) json_out(503, ['error' => '管理パスワードがまだ設定されていません']);
-    $pw = (string) (read_json(10_000)['password'] ?? '');
-    if (!password_ok($pw)) {
+    $c = load_config();
+    if (!$c['users']) json_out(503, ['error' => '管理アカウントがまだ設定されていません']);
+    $body = read_json(10_000);
+    $id = trim((string) ($body['id'] ?? ''));
+    $pw = (string) ($body['password'] ?? '');
+    $i = user_index($c, $id);
+    if (!verify_pw($i >= 0 ? $c['users'][$i]['password'] : null, $pw)) {
         sleep(1); // 総当たり対策
-        json_out(401, ['error' => 'パスワードが違います']);
+        json_out(401, ['error' => 'ID またはパスワードが違います']);
     }
     session_regenerate_id(true);
+    $_SESSION['uid'] = $c['users'][$i]['id'];
     $_SESSION['exp'] = time() + SESSION_TTL;
-    json_out(200, ['ok' => true]);
+    json_out(200, ['ok' => true, 'user' => public_user($c['users'][$i])]);
 }
 if ($route === 'POST logout') {
     $_SESSION = [];
@@ -27,9 +33,11 @@ if ($route === 'POST logout') {
     json_out(200, ['ok' => true]);
 }
 
-if (!authed()) json_out(401, ['error' => 'ログインが必要です']);
+$me = current_user();
+if (!$me) json_out(401, ['error' => 'ログインが必要です']);
+$isAdmin = ($me['role'] ?? '') === 'admin';
 
-if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false]);
+if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false, 'user' => public_user($me)]);
 
 if ($route === 'PUT site') {
     $site = read_json(2_000_000);
@@ -50,6 +58,80 @@ if ($route === 'POST upload') {
     $name = base_convert((string) time(), 10, 36) . '-' . bin2hex(random_bytes(6)) . '.' . ($m[1] === 'jpeg' ? 'jpg' : $m[1]);
     file_put_contents(UPLOAD_DIR . '/' . $name, $bin);
     json_out(200, ['url' => 'uploads/' . $name]);
+}
+
+// ---------- 自分のアカウント：ID・パスワードの変更（今のパスワードが必要） ----------
+if ($route === 'POST account') {
+    $b = read_json(10_000);
+    $c = load_config();
+    $i = user_index($c, $me['id']);
+    if (!verify_pw($c['users'][$i]['password'], (string) ($b['currentPassword'] ?? ''))) {
+        sleep(1);
+        json_out(400, ['error' => '今のパスワードが違います']);
+    }
+    $newId = trim((string) ($b['newId'] ?? ''));
+    $newPw = (string) ($b['newPassword'] ?? '');
+    if ($newId === '' && $newPw === '') json_out(400, ['error' => '変更する内容を入力してください']);
+    if ($newId !== '') {
+        if (!valid_id($newId)) json_out(400, ['error' => 'ID は半角英数字と _ . @ - で3〜32文字にしてください']);
+        $j = user_index($c, $newId);
+        if ($j >= 0 && $j !== $i) json_out(400, ['error' => 'その ID はすでに使われています']);
+        $c['users'][$i]['id'] = $newId;
+        $_SESSION['uid'] = $newId;
+    }
+    if ($newPw !== '') {
+        if (!valid_pw($newPw)) json_out(400, ['error' => 'パスワードは8文字以上にしてください']);
+        $c['users'][$i]['password'] = hash_pw($newPw);
+    }
+    save_config($c);
+    json_out(200, ['ok' => true, 'user' => public_user($c['users'][$i])]);
+}
+
+// ---------- ユーザー管理（管理者だけ） ----------
+if (str_starts_with($route, 'GET users') || str_starts_with($route, 'POST users')) {
+    if (!$isAdmin) json_out(403, ['error' => 'この操作は管理者だけができます']);
+    $c = load_config();
+
+    if ($route === 'GET users') json_out(200, ['users' => array_map('public_user', $c['users'])]);
+
+    $b = read_json(10_000);
+    $id = trim((string) ($b['id'] ?? ''));
+    $role = in_array($b['role'] ?? '', ['admin', 'staff'], true) ? $b['role'] : null;
+
+    if ($route === 'POST users') {
+        if (!valid_id($id)) json_out(400, ['error' => 'ID は半角英数字と _ . @ - で3〜32文字にしてください']);
+        if (user_index($c, $id) >= 0) json_out(400, ['error' => 'その ID はすでに使われています']);
+        $pw = (string) ($b['password'] ?? '');
+        if (!valid_pw($pw)) json_out(400, ['error' => 'パスワードは8文字以上にしてください']);
+        $c['users'][] = ['id' => $id, 'role' => $role ?? 'staff', 'password' => hash_pw($pw), 'created' => date('c')];
+        save_config($c);
+        json_out(200, ['ok' => true, 'users' => array_map('public_user', $c['users'])]);
+    }
+
+    $i = user_index($c, $id);
+    if ($i < 0) json_out(404, ['error' => 'そのユーザーは見つかりません']);
+
+    if ($route === 'POST users/update') {
+        if ($role && $role !== 'admin' && ($c['users'][$i]['role'] ?? '') === 'admin' && admin_count($c) <= 1) {
+            json_out(400, ['error' => '管理者が1人もいなくなるため変更できません']);
+        }
+        if ($role) $c['users'][$i]['role'] = $role;
+        $pw = (string) ($b['password'] ?? '');
+        if ($pw !== '') {
+            if (!valid_pw($pw)) json_out(400, ['error' => 'パスワードは8文字以上にしてください']);
+            $c['users'][$i]['password'] = hash_pw($pw);
+        }
+        save_config($c);
+        json_out(200, ['ok' => true, 'users' => array_map('public_user', $c['users'])]);
+    }
+
+    if ($route === 'POST users/delete') {
+        if (strcasecmp($c['users'][$i]['id'], $me['id']) === 0) json_out(400, ['error' => '自分自身は削除できません']);
+        if (($c['users'][$i]['role'] ?? '') === 'admin' && admin_count($c) <= 1) json_out(400, ['error' => '最後の管理者は削除できません']);
+        array_splice($c['users'], $i, 1);
+        save_config($c);
+        json_out(200, ['ok' => true, 'users' => array_map('public_user', $c['users'])]);
+    }
 }
 
 json_out(404, ['error' => 'Not found']);

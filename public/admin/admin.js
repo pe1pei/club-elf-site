@@ -17,6 +17,7 @@
     { id: 'sns', label: 'SNS', page: 'index', section: 'footer' },
     { id: 'seo', label: 'SEO', page: 'index', section: 'about' },
     { id: 'theme', label: 'デザイン', page: 'index', section: 'cast' },
+    { id: 'account', label: 'アカウント', page: 'index', section: 'top' },
   ];
   const SNS_TYPES = [['instagram', 'Instagram'], ['x', 'X'], ['tiktok', 'TikTok'], ['line', 'LINE'], ['youtube', 'YouTube'], ['web', 'その他URL']];
   // キャストの見せ方。pic は選択カード用のミニ図（3枚のカードの位置）
@@ -189,7 +190,7 @@
 
   // ---------- タブ ----------
   function renderTabs() {
-    $('#tabs').innerHTML = TABS.map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
+    $('#tabs').innerHTML = TABS.filter((t) => !(DEMO && t.id === 'account')).map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
   }
   function selectTab(id) {
     tab = id;
@@ -198,6 +199,7 @@
     renderPanel();
     panel.scrollTop = 0;
     syncPreview();
+    if (id === 'account') loadAccounts();
   }
 
   // ---------- フォーム部品 ----------
@@ -233,7 +235,75 @@
   };
   const weekKeys = () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // ---------- アカウント（ID ＋ パスワード） ----------
+  // サイトの下書きとは別に、変更はその場でサーバーへ送る（「保存して公開」は不要）
+  let me_ = null;          // ログイン中のユーザー { id, role }
+  let accounts = null;     // ユーザー一覧（管理者のみ）
+  let resetOpen = '';      // パスワード再設定欄を開いているユーザー
+  const ROLE_LABEL = { admin: '管理者', staff: 'スタッフ' };
+  async function loadAccounts() {
+    if (DEMO || me_?.role !== 'admin') return;
+    try { accounts = (await api('/api/users')).users; } catch (err) { toast(err.message, true); accounts = []; }
+    if (tab === 'account') renderPanel();
+  }
+  async function acctUpdate(body, okMsg) {
+    try { accounts = (await api('/api/users/update', { method: 'POST', body: JSON.stringify(body) })).users; toast(okMsg); }
+    catch (err) { toast(err.message, true); }
+    renderPanel();
+  }
+  function accountView() {
+    if (DEMO) return '<p class="hint">お試しモードではアカウントの管理はできません。</p>';
+    if (!me_) return '<p class="hint">読み込み中…</p>';
+    const isAdmin = me_.role === 'admin';
+    const users = isAdmin ? (accounts === null ? '<p class="hint">読み込み中…</p>' : `<ul class="list">${accounts.map((u) => {
+      const self = u.id.toLowerCase() === me_.id.toLowerCase();
+      return `<li class="item"><div class="row acct-row">
+          <div class="name"><b>${esc(u.id)}</b><small>${ROLE_LABEL[u.role] || u.role}${self ? '・自分' : ''}</small></div>
+          <select data-acct-role="${esc(u.id)}" ${self ? 'disabled title="自分の権限は変えられません"' : ''}>
+            <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>スタッフ</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>管理者</option>
+          </select>
+          ${self ? '' : `<button class="btn sm" data-act="acct-reset" data-id="${esc(u.id)}">パスワード再設定</button>
+          <button class="btn sm danger" data-act="acct-del" data-id="${esc(u.id)}" data-confirm>削除</button>`}
+        </div>
+        ${resetOpen === u.id ? `<div class="edit acct-reset">
+          <input type="password" id="acResetPw" autocomplete="new-password" placeholder="新しいパスワード（8文字以上）">
+          <button class="btn sm primary" data-act="acct-reset-do" data-id="${esc(u.id)}">設定する</button>
+        </div>` : ''}
+      </li>`;
+    }).join('')}</ul>`) : '';
+    return `
+      <h3>自分のアカウント</h3>
+      <p class="sum">ログイン中：<b>${esc(me_.id)}</b>（${ROLE_LABEL[me_.role] || me_.role}）</p>
+      <div class="acct-box">
+        <label class="f"><span>新しい ID（変えない場合は空欄）</span><input id="acNewId" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="${esc(me_.id)}"><small>半角英数字と _ . @ - で3〜32文字</small></label>
+        <div class="grid2">
+          <label class="f"><span>新しいパスワード</span><input id="acNewPw" type="password" autocomplete="new-password" placeholder="変えない場合は空欄"></label>
+          <label class="f"><span>新しいパスワード（確認）</span><input id="acNewPw2" type="password" autocomplete="new-password"></label>
+        </div>
+        <label class="f"><span>今のパスワード（必須）</span><input id="acCurPw" type="password" autocomplete="current-password"></label>
+        <button class="btn primary" data-act="acct-save">変更する</button>
+      </div>
+      ${isAdmin ? `
+        <h3>ユーザー一覧</h3>
+        ${users}
+        <h3>ユーザーを追加</h3>
+        <div class="acct-box">
+          <div class="grid2">
+            <label class="f"><span>ID</span><input id="auId" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：staff01"></label>
+            <label class="f"><span>初期パスワード</span><input id="auPw" type="password" autocomplete="new-password" placeholder="8文字以上"></label>
+          </div>
+          <label class="f"><span>権限</span><select id="auRole">
+            <option value="staff">スタッフ（サイトの編集だけ）</option>
+            <option value="admin">管理者（ユーザーの管理もできる）</option>
+          </select></label>
+          <button class="btn primary" data-act="acct-add">追加する</button>
+          <p class="hint" style="margin-top:8px">追加した人には ID と初期パスワードを直接伝えてください。ログイン後、この画面で自分のパスワードに変えられます。</p>
+        </div>` : '<p class="hint">ユーザーの追加・管理は管理者だけができます。</p>'}`;
+  }
+
   const views = {
+    account: () => accountView(),
     shift() {
       const sh = site.shift;
       const tk = todayKey();
@@ -542,6 +612,7 @@
   panel.addEventListener('input', (e) => {
     const el = e.target;
     if (el.id === 'brush') { brush = el.value; return; }
+    if (el.dataset.acctRole) { acctUpdate({ id: el.dataset.acctRole, role: el.value }, '権限を変更しました'); return; }
     const path = el.dataset.path;
     if (!path) return;
     let v;
@@ -640,6 +711,43 @@
       const old = b.textContent;
       b.textContent = 'もう一度押すと実行';
       setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = old; } }, 3000);
+      return;
+    }
+
+    // ---- アカウント ----
+    const val = (sel) => (panel.querySelector(sel)?.value || '');
+    if (act === 'acct-save') {
+      const newId = val('#acNewId').trim(), newPassword = val('#acNewPw'), currentPassword = val('#acCurPw');
+      if (!newId && !newPassword) return toast('新しい ID か新しいパスワードを入力してください', true);
+      if (newPassword && newPassword !== val('#acNewPw2')) return toast('新しいパスワード（確認）が一致しません', true);
+      if (!currentPassword) return toast('今のパスワードを入力してください', true);
+      try {
+        const res = await api('/api/account', { method: 'POST', body: JSON.stringify({ newId, newPassword, currentPassword }) });
+        me_ = res.user;
+        $('#who').textContent = `ログイン中：${me_.id}`;
+        toast(newId && newPassword ? 'ID とパスワードを変更しました' : newId ? 'ID を変更しました' : 'パスワードを変更しました');
+        renderPanel();
+        loadAccounts();
+      } catch (err) { toast(err.message, true); }
+      return;
+    }
+    if (act === 'acct-add') {
+      const id = val('#auId').trim(), password = val('#auPw'), role = val('#auRole');
+      if (!id || !password) return toast('ID と初期パスワードを入力してください', true);
+      try { accounts = (await api('/api/users', { method: 'POST', body: JSON.stringify({ id, password, role }) })).users; toast(`${id} を追加しました`); renderPanel(); }
+      catch (err) { toast(err.message, true); }
+      return;
+    }
+    if (act === 'acct-reset') { resetOpen = resetOpen === b.dataset.id ? '' : b.dataset.id; renderPanel(); panel.querySelector('#acResetPw')?.focus(); return; }
+    if (act === 'acct-reset-do') {
+      const password = val('#acResetPw');
+      if (!password) return toast('新しいパスワードを入力してください', true);
+      resetOpen = '';
+      return acctUpdate({ id: b.dataset.id, password }, `${b.dataset.id} のパスワードを再設定しました`);
+    }
+    if (act === 'acct-del') {
+      try { accounts = (await api('/api/users/delete', { method: 'POST', body: JSON.stringify({ id: b.dataset.id }) })).users; toast(`${b.dataset.id} を削除しました`); renderPanel(); }
+      catch (err) { toast(err.message, true); }
       return;
     }
 
@@ -861,14 +969,14 @@
   function showLogin() {
     $('#app').hidden = true;
     $('#login').hidden = false;
-    $('#loginForm [name=password]').focus();
+    $('#loginForm [name=id]').focus();
   }
   $('#loginForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button');
     btn.disabled = true;
     $('#loginErr').textContent = '';
-    const r = await fetch('../api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: e.target.password.value }) });
+    const r = await fetch('../api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: e.target.id.value.trim(), password: e.target.password.value }) });
     btn.disabled = false;
     if (!r.ok) { $('#loginErr').textContent = (await r.json().catch(() => ({}))).error || 'ログインできませんでした'; return; }
     e.target.reset();
@@ -892,6 +1000,8 @@
       if (me.status === 401) return showLogin();
       const info = await me.json();
       $('#warn').hidden = !info.defaultPassword;
+      me_ = info.user || null;
+      $('#who').textContent = me_ ? `ログイン中：${me_.id}` : '';
     }
     if (!site) {
       let data = null;
@@ -902,9 +1012,11 @@
     }
     $('#login').hidden = true;
     $('#app').hidden = false;
+    if (DEMO && tab === 'account') tab = 'shift';
     renderTabs();
     changed({ rerender: true });
     syncPreview();
+    if (tab === 'account') loadAccounts();
   }
   start();
 })();

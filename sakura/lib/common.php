@@ -85,23 +85,65 @@ function start_session(): void {
     session_start();
 }
 
-function authed(): bool {
-    $exp = $_SESSION['exp'] ?? 0;
-    if (!$exp || $exp < time()) return false;
-    $_SESSION['exp'] = time() + SESSION_TTL;
-    return true;
+// ---------- アカウント（ID ＋ パスワード） ----------
+// data/config.json の users に [{ id, role: admin|staff, password: PBKDF2 ハッシュ, created }] を持つ。
+// 旧形式（password だけ）は ID「admin」の管理者として読み替える。
+const PW_ITER = 210000;
+
+function load_config(): array {
+    $c = is_file(CONFIG_FILE) ? json_decode((string) file_get_contents(CONFIG_FILE), true) : [];
+    if (!is_array($c)) $c = [];
+    if (empty($c['users']) && is_array($c['password'] ?? null)) {
+        $c['users'] = [['id' => 'admin', 'role' => 'admin', 'password' => $c['password'], 'created' => date('c')]];
+        unset($c['password']);
+    }
+    if (!is_array($c['users'] ?? null)) $c['users'] = [];
+    return $c;
 }
 
-// パスワードは tools/set-password.js が作る PBKDF2 ハッシュ（data/config.json）で照合する
-function password_config(): ?array {
-    if (!is_file(CONFIG_FILE)) return null;
-    $c = json_decode((string) file_get_contents(CONFIG_FILE), true);
-    return is_array($c['password'] ?? null) ? $c['password'] : null;
+function save_config(array $c): void {
+    if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0700, true);
+    $tmp = CONFIG_FILE . '.tmp';
+    file_put_contents($tmp, json_encode($c, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), LOCK_EX);
+    @chmod($tmp, 0600);
+    rename($tmp, CONFIG_FILE);
 }
 
-function password_ok(string $input): bool {
-    $p = password_config();
-    if (!$p || ($p['algo'] ?? '') !== 'pbkdf2-sha256') return false;
-    $calc = hash_pbkdf2('sha256', $input, base64_decode($p['salt']), (int) $p['iter'], 32, true);
+function hash_pw(string $pw): array {
+    $salt = random_bytes(16);
+    return ['algo' => 'pbkdf2-sha256', 'iter' => PW_ITER, 'salt' => base64_encode($salt),
+            'hash' => base64_encode(hash_pbkdf2('sha256', $pw, $salt, PW_ITER, 32, true))];
+}
+
+function verify_pw(?array $p, string $pw): bool {
+    if (!$p || ($p['algo'] ?? '') !== 'pbkdf2-sha256') {
+        hash_pbkdf2('sha256', $pw, 'dummy-salt-0000', PW_ITER, 32, true); // ID が無いときも同じだけ時間をかける
+        return false;
+    }
+    $calc = hash_pbkdf2('sha256', $pw, base64_decode($p['salt']), (int) $p['iter'], 32, true);
     return hash_equals(base64_decode($p['hash']), $calc);
 }
+
+function user_index(array $c, string $id): int {
+    foreach ($c['users'] as $i => $u) if (strcasecmp($u['id'], $id) === 0) return $i;
+    return -1;
+}
+
+function valid_id(string $id): bool { return (bool) preg_match('/^[A-Za-z0-9_.@-]{3,32}$/', $id); }
+function valid_pw(string $pw): bool { return mb_strlen($pw) >= 8 && mb_strlen($pw) <= 128; }
+function admin_count(array $c): int { return count(array_filter($c['users'], fn ($u) => ($u['role'] ?? '') === 'admin')); }
+function public_user(array $u): array { return ['id' => $u['id'], 'role' => $u['role'] ?? 'staff', 'created' => $u['created'] ?? '']; }
+
+// ログイン中のユーザー（期限切れ・削除済みなら null）
+function current_user(): ?array {
+    $exp = $_SESSION['exp'] ?? 0;
+    $uid = (string) ($_SESSION['uid'] ?? '');
+    if (!$exp || $exp < time() || $uid === '') return null;
+    $c = load_config();
+    $i = user_index($c, $uid);
+    if ($i < 0) return null;
+    $_SESSION['exp'] = time() + SESSION_TTL;
+    return $c['users'][$i];
+}
+
+function authed(): bool { return current_user() !== null; }
