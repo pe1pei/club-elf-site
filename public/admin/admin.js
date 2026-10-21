@@ -12,6 +12,7 @@
     { id: 'hero', label: 'トップ画像', page: 'index', section: 'top' },
     { id: 'price', label: '料金', page: 'index', section: 'system' },
     { id: 'recruit', label: '求人', page: 'recruit', section: 'recruit' },
+    { id: 'stats', label: 'アクセス', page: 'index', section: 'top' },
     { id: 'shop', label: '店舗情報', page: 'index', section: 'info' },
     { id: 'branches', label: '支店', page: 'index', section: 'branches' },
     { id: 'sns', label: 'SNS', page: 'index', section: 'footer' },
@@ -190,7 +191,7 @@
 
   // ---------- タブ ----------
   function renderTabs() {
-    $('#tabs').innerHTML = TABS.filter((t) => !(DEMO && t.id === 'account')).map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
+    $('#tabs').innerHTML = TABS.filter((t) => !(DEMO && (t.id === 'account' || t.id === 'stats'))).map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
   }
   function selectTab(id) {
     tab = id;
@@ -200,6 +201,7 @@
     panel.scrollTop = 0;
     syncPreview();
     if (id === 'account') loadAccounts();
+    if (id === 'stats') loadStats();
   }
 
   // ---------- フォーム部品 ----------
@@ -234,6 +236,70 @@
     return Array.from({ length: new Date(y, m, 0).getDate() }, (_, i) => `${monthCursor}-${pad(i + 1)}`);
   };
   const weekKeys = () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // ---------- アクセス（管理画面での集計表示） ----------
+  let stats = null;        // サーバーからの集計
+  let statsDays = 30;      // 表示する期間（日）
+  const PAGE_LABEL = { index: 'トップページ', recruit: '求人ページ', other: 'その他' };
+  const TAG_LINKS = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['x', 'X（旧Twitter）'], ['line', 'LINE'], ['nightstyle', 'ナイスタ'], ['gmb', 'Googleマップ'], ['qr', 'QRコード・名刺']];
+  async function loadStats() {
+    if (DEMO) return;
+    try { stats = await api(`/api/stats?days=${statsDays}`); } catch (err) { toast(err.message, true); stats = { days: [], sources: {}, pages: {}, views: 0, visitors: 0 }; }
+    if (tab === 'stats') renderPanel();
+  }
+  const fmt = (n) => Number(n || 0).toLocaleString('ja-JP');
+  function barList(obj, labelOf = (k) => k) {
+    const entries = Object.entries(obj || {});
+    const total = entries.reduce((a, [, n]) => a + n, 0);
+    if (!total) return '<p class="hint">まだデータがありません。</p>';
+    const max = Math.max(...entries.map(([, n]) => n));
+    return `<ul class="rank">${entries.map(([k, n]) => `<li>
+      <span class="rank-label">${esc(labelOf(k))}</span>
+      <span class="rank-bar"><i style="width:${Math.max(2, (n / max) * 100)}%"></i></span>
+      <span class="rank-num">${fmt(n)}<small>${Math.round((n / total) * 100)}%</small></span>
+    </li>`).join('')}</ul>`;
+  }
+  function statsView() {
+    if (DEMO) return '<p class="hint">お試しモードではアクセス集計は見られません。</p>';
+    const configured = String(site.seo?.siteUrl || '').trim();
+    const base = configured ? configured.replace(/\/?$/, '/') : new URL('../', location.href).href;
+    const periods = [[1, '今日'], [7, '7日'], [30, '30日'], [90, '90日']];
+    let body = '<p class="hint">読み込み中…</p>';
+    if (stats) {
+      const days = stats.days || [];
+      const max = Math.max(1, ...days.map((d) => d.visitors));
+      const perVisit = stats.visitors ? (stats.views / stats.visitors).toFixed(1) : '—';
+      const md = (d) => d.slice(5).replace('-', '/');
+      body = `
+        <div class="tiles">
+          <div class="tile"><span>訪問者数</span><b>${fmt(stats.visitors)}</b><small>人（1日ごとに数えた合計）</small></div>
+          <div class="tile"><span>表示回数</span><b>${fmt(stats.views)}</b><small>回</small></div>
+          <div class="tile"><span>1人あたり</span><b>${perVisit}</b><small>ページ</small></div>
+        </div>
+        ${days.length > 1 ? `<h3>日ごとの訪問者数</h3>
+        <div class="daychart" role="img" aria-label="日ごとの訪問者数のグラフ">
+          <span class="daychart-max">最大 ${fmt(max)}人</span>
+          <div class="daychart-bars">${days.map((d) => `<span class="dbar" style="--h:${(d.visitors / max) * 100}%" data-tip="${md(d.date)}：${fmt(d.visitors)}人・${fmt(d.views)}回"></span>`).join('')}</div>
+          <div class="daychart-axis"><span>${md(days[0].date)}</span><span>${md(days[days.length - 1].date)}</span></div>
+        </div>` : ''}
+        <h3>どこから来たか</h3>
+        <p class="hint">訪問者ごとに、来たきっかけを1回数えます。「直接・アプリ内（不明）」は、ブックマークや URL の直接入力、Instagram・LINE などのアプリ内から開いた場合です（アプリは来た場所を教えてくれないことが多いため）。</p>
+        ${barList(stats.sources)}
+        <h3>よく見られたページ</h3>
+        ${barList(stats.pages, (k) => PAGE_LABEL[k] || k)}
+        ${stats.local ? '<p class="hint">※ 手元の確認用サーバーでは集計しません。本番（clubelf.jp）で数えます。</p>' : ''}`;
+    }
+    return `
+      <div class="sub-tabs">${periods.map(([d, l]) => `<button data-stats-days="${d}" class="${statsDays === d ? 'on' : ''}">${l}</button>`).join('')}</div>
+      ${body}
+      <h3>SNS に貼る「目印付きリンク」</h3>
+      <p class="hint">プロフィールのリンク欄にはこちらを貼ってください。アプリから来た人も「どこから来たか」が正しく分かります。</p>
+      <ul class="taglinks">${TAG_LINKS.map(([k, l]) => `<li><span>${l}</span><code>${esc(base)}?from=${k}</code><button class="btn sm" data-act="copy" data-text="${esc(base)}?from=${k}">コピー</button></li>`).join('')}</ul>
+      <h3>Google アナリティクス</h3>
+      <p class="hint">もっと詳しく（地域・機種・時間帯・滞在時間など）見たいときに使います。Google アナリティクスで発行された「測定ID」（G- で始まる番号）を入れて「保存して公開」を押すと、計測が始まります。</p>
+      ${field('測定ID', 'seo.gaId', { ph: '例：G-XXXXXXXXXX', hint: '空欄なら Google アナリティクスは使いません' })}
+      <a class="btn" href="https://analytics.google.com/" target="_blank" rel="noopener">Google アナリティクスを開く ↗</a>`;
+  }
 
   // ---------- アカウント（ID ＋ パスワード） ----------
   // サイトの下書きとは別に、変更はその場でサーバーへ送る（「保存して公開」は不要）
@@ -304,6 +370,7 @@
 
   const views = {
     account: () => accountView(),
+    stats: () => statsView(),
     shift() {
       const sh = site.shift;
       const tk = todayKey();
@@ -697,6 +764,8 @@
   panel.addEventListener('click', async (e) => {
     const sub = e.target.closest('[data-sub]');
     if (sub) { recruitSub = sub.dataset.sub; renderPanel(); syncPreview(); return; }
+    const sd = e.target.closest('[data-stats-days]');
+    if (sd) { statsDays = Number(sd.dataset.statsDays); stats = null; renderPanel(); return loadStats(); }
     const sv = e.target.closest('[data-shiftview]');
     if (sv) { shiftView = sv.dataset.shiftview; return renderPanel(); }
     const b = e.target.closest('[data-act]');
@@ -714,6 +783,11 @@
       return;
     }
 
+    if (act === 'copy') {
+      try { await navigator.clipboard.writeText(b.dataset.text); toast('コピーしました'); }
+      catch { toast('コピーできませんでした。長押しで選んでコピーしてください', true); }
+      return;
+    }
     // ---- アカウント ----
     const val = (sel) => (panel.querySelector(sel)?.value || '');
     if (act === 'acct-save') {
@@ -1012,11 +1086,12 @@
     }
     $('#login').hidden = true;
     $('#app').hidden = false;
-    if (DEMO && tab === 'account') tab = 'shift';
+    if (DEMO && (tab === 'account' || tab === 'stats')) tab = 'shift';
     renderTabs();
     changed({ rerender: true });
     syncPreview();
     if (tab === 'account') loadAccounts();
+    if (tab === 'stats') loadStats();
   }
   start();
 })();

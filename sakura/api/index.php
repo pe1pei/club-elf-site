@@ -9,6 +9,15 @@ if ($method !== 'GET' && !same_origin()) json_out(403, ['error' => '不正なリ
 
 if ($route === 'GET site') json_out(200, load_site());
 
+// 公開ページの表示を1回数える（ログイン中のスタッフの閲覧は数えない）。応答は空
+if ($route === 'POST hit') {
+    $b = json_decode(read_body(4_000), true) ?: [];
+    if (!empty($_COOKIE['elf_admin'])) { start_session(); if (current_user()) { http_response_code(204); exit; } }
+    record_hit((string) ($b['page'] ?? ''), (string) ($b['ref'] ?? ''), (string) ($b['from'] ?? ''));
+    http_response_code(204);
+    exit;
+}
+
 start_session();
 
 if ($route === 'POST login') {
@@ -36,6 +45,8 @@ if ($route === 'POST logout') {
 $me = current_user();
 if (!$me) json_out(401, ['error' => 'ログインが必要です']);
 $isAdmin = ($me['role'] ?? '') === 'admin';
+
+if ($route === 'GET stats') json_out(200, stats_summary((int) ($_GET['days'] ?? 30)));
 
 if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false, 'user' => public_user($me)]);
 

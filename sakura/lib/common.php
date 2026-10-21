@@ -3,6 +3,8 @@
 // Node 版 server.js と同じ API を提供する。データは data/ に置き、.htaccess で外から見えないようにする。
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Tokyo'); // 日付の区切り・バックアップ名を日本時間に
+
 const ROOT = __DIR__ . '/..';
 const DATA_DIR = ROOT . '/data';
 const SITE_FILE = DATA_DIR . '/site.json';
@@ -147,3 +149,88 @@ function current_user(): ?array {
 }
 
 function authed(): bool { return current_user() !== null; }
+
+// ---------- アクセス集計（クッキーなし・IP は保存しない） ----------
+// 1日1ファイル data/stats/YYYY-MM-DD.json に、表示回数・訪問者数・流入元・ページ別を数える。
+// 訪問者は「日付＋秘密の値＋IP＋ブラウザ」のハッシュで1日だけ区別する（翌日には別人扱い。元の IP には戻せない）。
+const STATS_DIR = DATA_DIR . '/stats';
+const STATS_KEEP_DAYS = 400;
+
+function stats_salt(): string {
+    $f = STATS_DIR . '/.salt';
+    if (!is_file($f)) { if (!is_dir(STATS_DIR)) mkdir(STATS_DIR, 0700, true); file_put_contents($f, bin2hex(random_bytes(16))); }
+    return (string) file_get_contents($f);
+}
+
+function client_ip(): string {
+    foreach (['HTTP_X_SAKURA_FORWARDED_FOR', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {
+        if (!empty($_SERVER[$k])) return trim(explode(',', (string) $_SERVER[$k])[0]);
+    }
+    return '';
+}
+
+// 流入元の分類。?from=instagram のような目印があればそれを優先
+function classify_source(string $from, string $ref, string $selfHost): string {
+    $named = ['instagram' => 'Instagram', 'ig' => 'Instagram', 'tiktok' => 'TikTok', 'x' => 'X（旧Twitter）', 'twitter' => 'X（旧Twitter）',
+              'line' => 'LINE', 'youtube' => 'YouTube', 'nightstyle' => 'ナイスタ', 'naisuta' => 'ナイスタ', 'google' => 'Google検索', 'gmb' => 'Googleマップ', 'map' => 'Googleマップ',
+              'facebook' => 'Facebook', 'card' => '名刺・ショップカード', 'qr' => 'QRコード', 'flyer' => 'チラシ'];
+    $from = strtolower(trim($from));
+    if ($from !== '') return $named[$from] ?? ('目印: ' . mb_substr(preg_replace('/[^\w.-]/u', '', $from), 0, 24));
+    $host = strtolower((string) parse_url($ref, PHP_URL_HOST));
+    if ($host === '') return '直接・アプリ内（不明）';
+    $host = preg_replace('/^(www|m|l|lm)\./', '', $host);
+    if ($host === preg_replace('/^www\./', '', strtolower($selfHost))) return '';  // サイト内の移動は数えない
+    $map = [
+        '/(^|\.)google\.[a-z.]+$/' => 'Google検索', '/(^|\.)yahoo\.co\.jp$|(^|\.)yahoo\.com$/' => 'Yahoo!検索', '/(^|\.)bing\.com$/' => 'Bing検索',
+        '/(^|\.)instagram\.com$/' => 'Instagram', '/(^|\.)(facebook\.com|fb\.com)$/' => 'Facebook', '/^(t\.co|x\.com|twitter\.com)$/' => 'X（旧Twitter）',
+        '/(^|\.)tiktok\.com$/' => 'TikTok', '/(^|\.)line\.me$|(^|\.)line-apps\.com$/' => 'LINE', '/(^|\.)youtube\.com$|^youtu\.be$/' => 'YouTube',
+        '/(^|\.)nightstyle\.jp$/' => 'ナイスタ', '/(^|\.)maps\.app\.goo\.gl$|^goo\.gl$/' => 'Googleマップ',
+    ];
+    foreach ($map as $re => $label) if (preg_match($re, $host)) return $label;
+    return $host;
+}
+
+function record_hit(string $page, string $ref, string $from): void {
+    $ua = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
+    if ($ua === '' || preg_match('/bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|curl|wget|python/i', $ua)) return;
+    $source = classify_source($from, $ref, (string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($source === '') return;
+    $page = in_array($page, ['index', 'recruit'], true) ? $page : 'other';
+    if (!is_dir(STATS_DIR)) mkdir(STATS_DIR, 0700, true);
+    $day = date('Y-m-d');
+    $visitor = substr(hash('sha256', $day . stats_salt() . client_ip() . $ua), 0, 16);
+    $f = STATS_DIR . "/$day.json";
+    $fp = fopen($f, 'c+');
+    if (!$fp) return;
+    flock($fp, LOCK_EX);
+    $d = json_decode((string) stream_get_contents($fp), true) ?: ['views' => 0, 'v' => [], 'sources' => [], 'pages' => []];
+    $d['views']++;
+    $new = !in_array($visitor, $d['v'], true);
+    if ($new) $d['v'][] = $visitor;
+    if ($new) $d['sources'][$source] = ($d['sources'][$source] ?? 0) + 1; // 流入元は訪問者ごとに1回だけ数える
+    $d['pages'][$page] = ($d['pages'][$page] ?? 0) + 1;
+    ftruncate($fp, 0); rewind($fp);
+    fwrite($fp, json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    flock($fp, LOCK_UN); fclose($fp);
+    if (random_int(1, 200) === 1) { // たまに古い日を掃除
+        $limit = date('Y-m-d', strtotime('-' . STATS_KEEP_DAYS . ' days'));
+        foreach (glob(STATS_DIR . '/*.json') ?: [] as $old) if (basename($old, '.json') < $limit) @unlink($old);
+    }
+}
+
+function stats_summary(int $days): array {
+    $days = max(1, min(STATS_KEEP_DAYS, $days));
+    $out = ['days' => [], 'sources' => [], 'pages' => [], 'views' => 0, 'visitors' => 0];
+    for ($i = $days - 1; $i >= 0; $i--) {
+        $day = date('Y-m-d', strtotime("-$i days"));
+        $f = STATS_DIR . "/$day.json";
+        $d = is_file($f) ? (json_decode((string) file_get_contents($f), true) ?: []) : [];
+        $views = (int) ($d['views'] ?? 0); $visitors = count($d['v'] ?? []);
+        $out['days'][] = ['date' => $day, 'views' => $views, 'visitors' => $visitors];
+        $out['views'] += $views; $out['visitors'] += $visitors;
+        foreach ($d['sources'] ?? [] as $k => $n) $out['sources'][$k] = ($out['sources'][$k] ?? 0) + $n;
+        foreach ($d['pages'] ?? [] as $k => $n) $out['pages'][$k] = ($out['pages'][$k] ?? 0) + $n;
+    }
+    arsort($out['sources']); arsort($out['pages']);
+    return $out;
+}

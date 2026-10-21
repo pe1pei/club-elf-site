@@ -92,6 +92,12 @@ function build_head(array $site, string $page): string {
         // JSON_HEX_TAG で < > をエスケープし、</script> で閉じられないようにする
         $tags[] = '<script type="application/ld+json">' . json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) . '</script>';
     }
+    // Google アナリティクス（測定ID が正しい形のときだけ）
+    $ga = strtoupper(trim((string) ($seo['gaId'] ?? '')));
+    if (preg_match('/^G-[A-Z0-9]{4,15}$/', $ga)) {
+        $tags[] = '<script async src="https://www.googletagmanager.com/gtag/js?id=' . $ga . '"></script>';
+        $tags[] = "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','$ga');</script>";
+    }
     return implode("\n", $tags);
 }
 

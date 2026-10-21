@@ -712,11 +712,28 @@
     });
     parent.postMessage({ type: 'ready', page: PAGE }, location.origin);
   } else {
+    trackView();
     loadSite()
       .then((s) => {
         render(s);
         if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
       })
       .catch(() => { app.innerHTML = '<p class="empty" style="padding:40vh 16px">読み込みに失敗しました。時間をおいて再度お試しください。</p>'; });
+  }
+
+  // アクセス集計：どのページを、どこから見に来たかだけをサーバーへ送る（クッキーなし）。
+  // SNS のプロフィールに貼る「?from=instagram」などの目印も送り、送ったあとは URL から消す（共有で混ざらないように）
+  function trackView() {
+    try {
+      const q = new URLSearchParams(location.search);
+      const from = q.get('from') || q.get('utm_source') || '';
+      const body = JSON.stringify({ page: PAGE, ref: document.referrer, from });
+      const ok = navigator.sendBeacon && navigator.sendBeacon('api/hit', new Blob([body], { type: 'text/plain' }));
+      if (!ok) fetch('api/hit', { method: 'POST', body, keepalive: true }).catch(() => {});
+      if (from) {
+        q.delete('from'); q.delete('utm_source');
+        history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+      }
+    } catch { /* 集計に失敗してもページの表示には影響させない */ }
   }
 })();

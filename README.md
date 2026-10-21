@@ -108,3 +108,10 @@ GitHub Pages はファイルを置くだけの仕組みでサーバーが動か�
 - アカウントは `data/config.json`（PBKDF2 ハッシュ）。旧形式（パスワードだけ）は ID「admin」として引き継ぎます。
 - `deploy-sakura.sh` は本番の `data/config.json` を上書きしません（本番で追加したアカウントを守るため）。
   締め出されたときは PC で `node tools/set-password.js` → `FORCE_CONFIG=1 sh tools/deploy-sakura.sh`。
+
+## アクセス解析
+
+- **管理画面の「アクセス」タブ**：訪問者数・表示回数・日ごとの推移・流入元（Google検索／Yahoo!／Instagram／LINE／X／TikTok／ナイスタ／直接など）・ページ別。期間は今日／7日／30日／90日。
+  - 本番（PHP 版）で `data/stats/日付.json` に1日ごとに集計。クッキーは使わず、IP は保存しない（日付＋秘密の値＋IP＋ブラウザのハッシュで1日だけ区別）。検索ロボットとログイン中のスタッフの閲覧は数えない。400日分を保持。
+  - SNS のプロフィールには `https://clubelf.jp/?from=instagram` のような「目印付きリンク」を貼る（アプリ内ブラウザは流入元を送らないため）。タブ内にコピー用のリンクあり。
+- **Google アナリティクス**：アクセスタブの「測定ID」（G-XXXXXXXXXX）を入れて保存すると、公開ページにだけ計測タグが入る。

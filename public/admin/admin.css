@@ -238,3 +238,29 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .acct-row select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: #fff; }
 .acct-reset { display: flex; gap: 8px; align-items: center; }
 .acct-reset input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+
+/* アクセス */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+.tile { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 10px 12px; display: grid; gap: 2px; }
+.tile span { font-size: 11px; color: var(--muted); }
+.tile b { font-size: 24px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.tile small { font-size: 10px; color: var(--muted); }
+.daychart { position: relative; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 22px 10px 6px; }
+.daychart-max { position: absolute; top: 4px; left: 10px; font-size: 10px; color: var(--muted); }
+.daychart-bars { height: 110px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); }
+.dbar { position: relative; flex: 1; min-width: 2px; height: max(var(--h), 1px); background: var(--accent); border-radius: 4px 4px 0 0; cursor: default; }
+.dbar::before { content: ""; position: absolute; left: -1px; right: -1px; bottom: 0; height: 110px; } /* 棒より広い当たり判定 */
+.dbar:hover { background: #8a6626; }
+.dbar:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; translate: -50% 0; white-space: nowrap; background: var(--primary); color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 6px; z-index: 2; pointer-events: none; }
+.daychart-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; }
+.rank { list-style: none; display: grid; gap: 6px; }
+.rank li { display: grid; grid-template-columns: minmax(90px, 38%) 1fr auto; align-items: center; gap: 8px; font-size: 13px; }
+.rank-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-bar { height: 10px; background: #f0eeeb; border-radius: 99px; overflow: hidden; }
+.rank-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.rank-num { font-variant-numeric: tabular-nums; text-align: right; min-width: 70px; }
+.rank-num small { color: var(--muted); margin-left: 6px; font-size: 11px; }
+.taglinks { list-style: none; display: grid; gap: 6px; margin-bottom: 8px; }
+.taglinks li { display: grid; grid-template-columns: 8.5em 1fr auto; align-items: center; gap: 8px; font-size: 12px; }
+.taglinks code { font-size: 11px; background: #f6f5f3; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) { .taglinks li { grid-template-columns: 1fr auto; } .taglinks li span { grid-column: 1 / -1; } }

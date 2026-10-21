@@ -124,6 +124,8 @@ async function api(req, res, url) {
   if (route === 'GET /api/site') {
     return json(res, 200, JSON.parse(await fsp.readFile(DATA, 'utf8')));
   }
+  // アクセス集計は本番（さくら・PHP 版）で行う。手元の Node 版では受け取るだけ
+  if (route === 'POST /api/hit') { res.writeHead(204); return res.end(); }
   if (route === 'POST /api/login') {
     const c = loadConfig();
     const { id = '', password = '' } = JSON.parse(await readBody(req, 10e3) || '{}');
@@ -144,6 +146,14 @@ async function api(req, res, url) {
   const me = currentUser(req);
   if (!me) return json(res, 401, { error: 'ログインが必要です' });
 
+  if (route === 'GET /api/stats') {
+    const days = Math.max(1, Math.min(400, Number(url.searchParams.get('days')) || 30));
+    const list = Array.from({ length: days }, (_, i) => {
+      const d = new Date(Date.now() - (days - 1 - i) * 864e5);
+      return { date: d.toISOString().slice(0, 10), views: 0, visitors: 0 };
+    });
+    return json(res, 200, { days: list, sources: {}, pages: {}, views: 0, visitors: 0, local: true });
+  }
   if (route === 'GET /api/me') {
     return json(res, 200, { ok: true, defaultPassword: !!loadConfig().dev && PASSWORD === 'changeme', user: publicUser(me) });
   }
