@@ -13,6 +13,7 @@ if (!in_array($p, ['index', 'recruit', 'admin', 'sitemap', 'robots'], true)) $p 
     $u = trim((string) ($site['seo']['siteUrl'] ?? ''));
     $want = parse_url($u);
     if ($u === '' || str_contains($u, 'github.io') || empty($want['host'])) return;
+    if (!in_array($want['scheme'] ?? '', ['http', 'https'], true) || !preg_match('/^[a-z0-9.-]+$/i', $want['host'])) return; // 変な URL には転送しない
     $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
     if (preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host)) return;
     $wantHttps = ($want['scheme'] ?? 'https') === 'https';

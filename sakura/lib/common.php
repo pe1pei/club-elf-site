@@ -4,6 +4,10 @@
 declare(strict_types=1);
 
 date_default_timezone_set('Asia/Tokyo'); // 日付の区切り・バックアップ名を日本時間に
+// エラーは画面に出さず、サーバーのログにだけ残す（ファイルの場所などを外に漏らさない）
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+header_remove('X-Powered-By');
 
 const ROOT = __DIR__ . '/..';
 const DATA_DIR = ROOT . '/data';
@@ -84,6 +88,16 @@ function start_session(): void {
     ]);
     ini_set('session.gc_maxlifetime', (string) SESSION_TTL);
     ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    if (PHP_VERSION_ID < 80400) { // PHP 8.4 以降は初めから十分な長さなので設定しない（8.4 で非推奨になった設定のため）
+        ini_set('session.sid_length', '48');
+        ini_set('session.sid_bits_per_character', '5'); // 0-9a-v（カンマ等を含まない）
+    }
+    $dir = DATA_DIR . '/sessions';
+    if (!is_dir($dir)) mkdir($dir, 0700, true);
+    session_save_path($dir);
+    ini_set('session.gc_probability', '1');
+    ini_set('session.gc_divisor', '100');
     session_start();
 }
 
@@ -150,11 +164,55 @@ function current_user(): ?array {
 
 function authed(): bool { return current_user() !== null; }
 
+// ---------- ログインの試行回数制限（総当たり対策） ----------
+// 同じ端末（接続元）から15分に5回、同じ ID へ15分に10回失敗したら、しばらくログインを受け付けない。
+// 接続元は、さくらの SSL プロキシが付けるヘッダー → REMOTE_ADDR の順（利用者が書き換えられる X-Forwarded-For は使わない）
+const LOGIN_WINDOW = 900;
+const LOGIN_MAX_PER_IP = 5;
+const LOGIN_MAX_PER_ID = 10;
+
+function login_ip(): string {
+    return trim(explode(',', (string) ($_SERVER['HTTP_X_SAKURA_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
+}
+
+// 失敗の記録（data/login-failures.json）。キーはハッシュなので IP や ID そのものは残らない
+function login_failures(callable $fn) {
+    if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0700, true);
+    $fp = fopen(DATA_DIR . '/login-failures.json', 'c+');
+    flock($fp, LOCK_EX);
+    $d = json_decode((string) stream_get_contents($fp), true) ?: [];
+    $now = time();
+    foreach ($d as $k => $times) { $d[$k] = array_values(array_filter($times, fn ($t) => $t > $now - LOGIN_WINDOW)); if (!$d[$k]) unset($d[$k]); }
+    $result = $fn($d, $now);
+    ftruncate($fp, 0); rewind($fp);
+    fwrite($fp, json_encode($d));
+    flock($fp, LOCK_UN); fclose($fp);
+    @chmod(DATA_DIR . '/login-failures.json', 0600);
+    return $result;
+}
+function login_keys(string $id): array {
+    return ['ip:' . substr(hash('sha256', login_ip()), 0, 20), 'id:' . substr(hash('sha256', strtolower($id)), 0, 20)];
+}
+function login_blocked(string $id): bool {
+    [$ipKey, $idKey] = login_keys($id);
+    return login_failures(fn (&$d) => count($d[$ipKey] ?? []) >= LOGIN_MAX_PER_IP || count($d[$idKey] ?? []) >= LOGIN_MAX_PER_ID);
+}
+function login_failed(string $id): void {
+    [$ipKey, $idKey] = login_keys($id);
+    login_failures(function (&$d, $now) use ($ipKey, $idKey) { $d[$ipKey][] = $now; $d[$idKey][] = $now; });
+}
+function login_succeeded(string $id): void {
+    [$ipKey, $idKey] = login_keys($id);
+    login_failures(function (&$d) use ($ipKey, $idKey) { unset($d[$ipKey], $d[$idKey]); });
+}
+
 // ---------- アクセス集計（クッキーなし・IP は保存しない） ----------
 // 1日1ファイル data/stats/YYYY-MM-DD.json に、表示回数・訪問者数・流入元・ページ別を数える。
 // 訪問者は「日付＋秘密の値＋IP＋ブラウザ」のハッシュで1日だけ区別する（翌日には別人扱い。元の IP には戻せない）。
 const STATS_DIR = DATA_DIR . '/stats';
 const STATS_KEEP_DAYS = 400;
+const STATS_MAX_VISITORS = 20000; // 1日に区別して数える訪問者の上限
+const STATS_MAX_SOURCES = 60;     // 1日に記録する流入元の種類の上限（超えた分は「その他」）
 
 function stats_salt(): string {
     $f = STATS_DIR . '/.salt';
@@ -163,7 +221,7 @@ function stats_salt(): string {
 }
 
 function client_ip(): string {
-    foreach (['HTTP_X_SAKURA_FORWARDED_FOR', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {
+    foreach (['HTTP_X_SAKURA_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {
         if (!empty($_SERVER[$k])) return trim(explode(',', (string) $_SERVER[$k])[0]);
     }
     return '';
@@ -206,7 +264,9 @@ function record_hit(string $page, string $ref, string $from): void {
     $d = json_decode((string) stream_get_contents($fp), true) ?: ['views' => 0, 'v' => [], 'sources' => [], 'pages' => []];
     $d['views']++;
     $new = !in_array($visitor, $d['v'], true);
+    if ($new && count($d['v']) >= STATS_MAX_VISITORS) { flock($fp, LOCK_UN); fclose($fp); return; } // 上限を超えた日はそれ以上数えない
     if ($new) $d['v'][] = $visitor;
+    if (!isset($d['sources'][$source]) && count($d['sources']) >= STATS_MAX_SOURCES) $source = 'その他';
     if ($new) $d['sources'][$source] = ($d['sources'][$source] ?? 0) + 1; // 流入元は訪問者ごとに1回だけ数える
     $d['pages'][$page] = ($d['pages'][$page] ?? 0) + 1;
     ftruncate($fp, 0); rewind($fp);

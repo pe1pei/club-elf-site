@@ -4,6 +4,13 @@
 DirectoryIndex page.php
 Options -Indexes
 
+# 設定・データ・作業用のファイルは、どのフォルダにあっても直接開かせない
+<FilesMatch "(^\.|\.(json|tmp|bak|log|md|sh|ini|lock)$|^composer\.)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
@@ -20,6 +27,24 @@ RewriteRule ^admin/(index\.html)?$ page.php?p=admin [L,QSA]
 
 # 管理画面用 API
 RewriteRule ^api/(.*)$ api/index.php?r=$1 [L,QSA]
+</IfModule>
+
+# セキュリティ用のヘッダー
+<IfModule mod_headers.c>
+  # 他のサイトの枠（iframe）の中に表示させない（管理画面を隠して押させる「クリックジャッキング」対策。プレビューは同じサイトなのでOK）
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Content-Security-Policy "frame-ancestors 'self'"
+  # ファイルの種類を勝手に推測させない
+  Header always set X-Content-Type-Options "nosniff"
+  # 他のサイトへ移動するとき、ページの URL を全部は渡さない
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # カメラ・マイク・位置情報などは使わない
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  # 一度来たブラウザには、以後ずっと https で接続させる
+  Header always set Strict-Transport-Security "max-age=31536000"
+  # PHP のバージョンを外に見せない
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
 </IfModule>
 
 # 画像・JS・CSS は少し長めにキャッシュ（JS/CSS は更新時に URL が変わる）

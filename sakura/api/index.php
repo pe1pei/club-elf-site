@@ -24,13 +24,16 @@ if ($route === 'POST login') {
     $c = load_config();
     if (!$c['users']) json_out(503, ['error' => '管理アカウントがまだ設定されていません']);
     $body = read_json(10_000);
-    $id = trim((string) ($body['id'] ?? ''));
-    $pw = (string) ($body['password'] ?? '');
+    $id = mb_substr(trim((string) ($body['id'] ?? '')), 0, 64);
+    $pw = mb_substr((string) ($body['password'] ?? ''), 0, 256);
+    if (login_blocked($id)) json_out(429, ['error' => 'ログインの失敗が続いたため、15分ほど待ってからお試しください']);
     $i = user_index($c, $id);
     if (!verify_pw($i >= 0 ? $c['users'][$i]['password'] : null, $pw)) {
+        login_failed($id);
         sleep(1); // 総当たり対策
         json_out(401, ['error' => 'ID またはパスワードが違います']);
     }
+    login_succeeded($id);
     session_regenerate_id(true);
     $_SESSION['uid'] = $c['users'][$i]['id'];
     $_SESSION['exp'] = time() + SESSION_TTL;
