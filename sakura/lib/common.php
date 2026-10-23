@@ -294,3 +294,75 @@ function stats_summary(int $days): array {
     arsort($out['sources']); arsort($out['pages']);
     return $out;
 }
+
+// ---------- あいことばクーポン ----------
+// 毎日 3:01 に切り替わる。その日初めて表示されたときに、合言葉と特典をそれぞれランダムに選んで data/coupon.json に記録する
+// （その日は誰が見ても同じ。翌日の分は 3:01 になるまで決まらないので先読みできない）。前日と同じものは選ばない。
+const COUPON_FILE = DATA_DIR . '/coupon.json';
+const COUPON_KEEP_DAYS = 90;
+
+// 3:01 区切りの「営業日」。3:00 までは前日扱い
+function coupon_day(?int $t = null): string { return date('Y-m-d', ($t ?? time()) - (3 * 3600 + 60)); }
+
+function coupon_term(string $day): array {
+    $from = strtotime("$day 03:01");
+    $to = $from + 86400 - 60;
+    return ['day' => $day, 'from' => date('n/j G:i', $from), 'to' => date('n/j G:i', $to)];
+}
+
+function coupon_active(array $list): array {
+    return array_values(array_filter($list, fn ($x) => is_array($x) && ($x['on'] ?? true) !== false && trim((string) ($x['text'] ?? '')) !== '' && ($x['id'] ?? '') !== ''));
+}
+
+function coupon_pick(array $active, ?string $avoidId): array {
+    $pool = count($active) > 1 ? array_values(array_filter($active, fn ($x) => $x['id'] !== $avoidId)) : $active;
+    return $pool[random_int(0, count($pool) - 1)];
+}
+
+// 今日のクーポン（表示しない設定・登録なしなら null）
+function coupon_today(array $site): ?array {
+    $cp = $site['coupon'] ?? [];
+    if (empty($cp['enabled'])) return null;
+    $words = coupon_active($cp['words'] ?? []);
+    $perks = coupon_active($cp['perks'] ?? []);
+    if (!$words || !$perks) return null;
+    if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0700, true);
+    $day = coupon_day();
+    $fp = fopen(COUPON_FILE, 'c+');
+    flock($fp, LOCK_EX);
+    $state = json_decode((string) stream_get_contents($fp), true) ?: [];
+    $state['days'] ??= [];
+    $today = $state['days'][$day] ?? null;
+    $find = fn ($list, $id) => current(array_filter($list, fn ($x) => $x['id'] === $id)) ?: null;
+    // 今日の分が決まっていて、選ばれた合言葉・特典がまだ有効ならそのまま。OFF や削除されていたら選び直す
+    $w = $today ? $find($words, $today['wordId']) : null;
+    $p = $today ? $find($perks, $today['perkId']) : null;
+    if (!$w || !$p) {
+        $prev = $state['days'][coupon_day(strtotime("$day 12:00") - 86400)] ?? null;
+        $w = $w ?: coupon_pick($words, $prev['wordId'] ?? null);
+        $p = $p ?: coupon_pick($perks, $prev['perkId'] ?? null);
+    }
+    $state['days'][$day] = ['wordId' => $w['id'], 'perkId' => $p['id'], 'word' => trim($w['text']), 'perk' => trim($p['text'])];
+    krsort($state['days']);
+    $state['days'] = array_slice($state['days'], 0, COUPON_KEEP_DAYS, true);
+    ftruncate($fp, 0); rewind($fp);
+    fwrite($fp, json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+    flock($fp, LOCK_UN); fclose($fp);
+    @chmod(COUPON_FILE, 0600);
+    return ['word' => trim($w['text']), 'perk' => trim($p['text'])] + coupon_term($day);
+}
+
+function coupon_history(int $days = 14): array {
+    $state = is_file(COUPON_FILE) ? (json_decode((string) file_get_contents(COUPON_FILE), true) ?: []) : [];
+    $out = [];
+    foreach (array_slice($state['days'] ?? [], 0, $days, true) as $day => $d) $out[] = ['word' => $d['word'], 'perk' => $d['perk']] + coupon_term($day);
+    return $out;
+}
+
+// 公開用のサイトデータ：合言葉・特典の一覧は渡さず、今日の分だけ付ける
+function public_site(array $site): array {
+    $today = coupon_today($site);
+    if (isset($site['coupon'])) $site['coupon'] = ['title' => $site['coupon']['title'] ?? '', 'note' => $site['coupon']['note'] ?? ''];
+    $site['couponToday'] = $today;
+    return $site;
+}

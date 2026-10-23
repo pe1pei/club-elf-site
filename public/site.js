@@ -178,10 +178,26 @@
     </header>`;
   }
 
+  // あいことばクーポン（毎日 3:01 に切り替わる。内容はサーバーが決めた今日の分だけが届く）
+  function couponHTML(s) {
+    const c = s.couponToday;
+    if (!c || !c.word || !c.perk) return '';
+    const title = s.coupon?.title || '本日のあいことばクーポン';
+    return `<section class="coupon" id="coupon" aria-label="${esc(title)}">
+      <p class="coupon-label">${esc(title)}</p>
+      <p class="coupon-word">「${esc(c.word)}」</p>
+      <p class="coupon-how">ご来店時にスタッフへこの合言葉をお伝えください</p>
+      <p class="coupon-perk">${esc(c.perk)}</p>
+      <p class="coupon-term">有効期限：${esc(c.from)} 〜 ${esc(c.to)}</p>
+      ${s.coupon?.note ? `<p class="coupon-note">${nl(s.coupon.note)}</p>` : ''}
+    </section>`;
+  }
+
   function footerHTML(s) {
     const sns = (s.sns || []).map((x) => ({ ...x, href: castSnsUrl(x.type, x.url) })).filter((x) => x.href);
     return `<footer class="ft" id="footer">
       ${sns.length ? `<p class="ft-follow">FOLLOW US</p><ul class="sns">${sns.map((x) => `<li><a href="${esc(x.href)}" target="_blank" rel="noopener" aria-label="${esc(SNS_LABEL[x.type] || 'Link')}">${ICON[x.type] || ICON.web}<span>${esc(SNS_LABEL[x.type] || 'Link')}</span></a></li>`).join('')}</ul>` : ''}
+      ${couponHTML(s)}
       <p class="ft-name">${esc(s.shop.name)}</p>
       <p class="ft-addr">${esc(s.shop.address)}${s.shop.phone ? ` ／ TEL ${esc(s.shop.phone)}` : ''}</p>
       ${recruitOn(s).length && PAGE === 'index' ? '<p class="ft-links"><a href="recruit.html">求人情報</a></p>' : ''}

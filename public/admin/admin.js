@@ -9,6 +9,7 @@
   const TABS = [
     { id: 'shift', label: '出勤', page: 'index', section: 'schedule' },
     { id: 'cast', label: 'キャスト', page: 'index', section: 'cast' },
+    { id: 'coupon', label: 'クーポン', page: 'index', section: 'coupon' },
     { id: 'hero', label: 'トップ画像', page: 'index', section: 'top' },
     { id: 'price', label: '料金', page: 'index', section: 'system' },
     { id: 'recruit', label: '求人', page: 'recruit', section: 'recruit' },
@@ -114,6 +115,8 @@
     s.theme.castLayout ||= 'coverflow';
     if (s.theme.castAutoplay === undefined) s.theme.castAutoplay = true;
     s.seo ||= {}; s.seo.keywords ||= [];
+    s.coupon ||= { enabled: false, title: '', words: [], perks: [], note: '' };
+    for (const k of ['words', 'perks']) { s.coupon[k] ||= []; s.coupon[k].forEach((x) => { x.id ||= uid(); if (x.on === undefined) x.on = true; }); }
     s.system ||= {};
     if (s.system.items) { s.system.plans = [{ title: '', items: s.system.items }]; delete s.system.items; }
     s.system.plans ||= [];
@@ -191,7 +194,7 @@
 
   // ---------- タブ ----------
   function renderTabs() {
-    $('#tabs').innerHTML = TABS.filter((t) => !(DEMO && (t.id === 'account' || t.id === 'stats'))).map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
+    $('#tabs').innerHTML = TABS.filter((t) => !(DEMO && ['account', 'stats', 'coupon'].includes(t.id))).map((t) => `<button data-tab="${t.id}" class="${t.id === tab ? 'on' : ''}">${t.label}</button>`).join('');
   }
   function selectTab(id) {
     tab = id;
@@ -202,6 +205,7 @@
     syncPreview();
     if (id === 'account') loadAccounts();
     if (id === 'stats') loadStats();
+    if (id === 'coupon') loadCoupon();
   }
 
   // ---------- フォーム部品 ----------
@@ -264,6 +268,45 @@
     return Array.from({ length: new Date(y, m, 0).getDate() }, (_, i) => `${monthCursor}-${pad(i + 1)}`);
   };
   const weekKeys = () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // ---------- あいことばクーポン ----------
+  let couponInfo = null; // { today, history }
+  async function loadCoupon() {
+    if (DEMO) return;
+    try { couponInfo = await api('/api/coupon'); } catch (err) { toast(err.message, true); }
+    if (tab === 'coupon') renderPanel();
+  }
+  function couponList(kind, label, ph) {
+    const list = site.coupon[kind];
+    return `<h3>${label} <small class="count">${list.filter((x) => x.on !== false && String(x.text || '').trim()).length}件が抽選の対象</small></h3>
+      ${list.map((x, i) => `<div class="inline coupon-row ${x.on === false ? 'off' : ''}">
+        ${sw(`coupon.${kind}.${i}.on`, '')}
+        <input data-path="coupon.${kind}.${i}.text" value="${esc(x.text)}" placeholder="${ph}">
+        <button class="icon-btn" data-act="del" data-list="coupon.${kind}" data-i="${i}" data-now aria-label="削除">×</button>
+      </div>`).join('')}
+      <div class="bar"><button class="btn sm" data-act="coupon-add" data-kind="${kind}">＋ ${label}を追加</button></div>`;
+  }
+  function couponView() {
+    if (DEMO) return '<p class="hint">お試しモードではクーポンは使えません。</p>';
+    const cp = site.coupon;
+    const t = couponInfo?.today;
+    const hist = (couponInfo?.history || []).slice(1);
+    return `
+      <div class="coupon-today ${t ? '' : 'none'}">
+        <span>今日のあいことば（${t ? `${esc(t.from)} 〜 ${esc(t.to)}` : '—'}）</span>
+        ${t ? `<b>「${esc(t.word)}」</b><em>${esc(t.perk)}</em>` : `<p>${cp.enabled ? '合言葉と特典をそれぞれ1つ以上登録して「保存して公開」を押すと決まります。' : '今はサイトに表示していません。'}</p>`}
+      </div>
+      <div class="shift-top">
+        ${sw('coupon.enabled', 'サイトに表示する（SNS リンクの下）')}
+        <p class="hint" style="margin:6px 0 0">毎日 <b>3:01</b> に、合言葉と特典がそれぞれランダムに切り替わります（前の日と同じものは出ません）。今日の分は保存しても変わりませんが、今日の合言葉・特典を OFF にしたり消したりすると、選び直されます。</p>
+      </div>
+      ${field('見出し', 'coupon.title', { ph: '本日のあいことばクーポン' })}
+      ${couponList('words', '合言葉', '例：エルフで乾杯')}
+      ${couponList('perks', '特典', '例：セット料金 1,000円引き')}
+      ${field('注意書き', 'coupon.note', { rows: 2, ph: '例：1組1回まで。他のクーポンとの併用はできません。' })}
+      ${hist.length ? `<h3>これまでの合言葉</h3><p class="hint">「昨日見た」というお客さんへの確認用です。</p>
+        <ul class="coupon-hist">${hist.map((h) => `<li><span>${esc(h.from)}〜</span><b>「${esc(h.word)}」</b><em>${esc(h.perk)}</em></li>`).join('')}</ul>` : ''}`;
+  }
 
   // ---------- アクセス（管理画面での集計表示） ----------
   let stats = null;        // サーバーからの集計
@@ -397,6 +440,7 @@
   }
 
   const views = {
+    coupon: () => couponView(),
     account: () => accountView(),
     stats: () => statsView(),
     shift() {
@@ -816,6 +860,12 @@
       return;
     }
 
+    if (act === 'coupon-add') {
+      const list = site.coupon[b.dataset.kind];
+      list.push({ id: uid(), text: '', on: true });
+      changed({ rerender: true });
+      return panel.querySelector(`[data-path="coupon.${b.dataset.kind}.${list.length - 1}.text"]`)?.focus();
+    }
     if (act === 'copy') {
       try { await navigator.clipboard.writeText(b.dataset.text); toast('コピーしました'); }
       catch { toast('コピーできませんでした。長押しで選んでコピーしてください', true); }
@@ -1037,6 +1087,7 @@
       savedJSON = JSON.stringify(site);
       changed();
       toast(DEMO ? '保存しました（このブラウザ内のみ）' : '保存して公開しました');
+      if (!DEMO && tab === 'coupon') loadCoupon();
     } catch (err) {
       toast(err.message, true);
       changed();
@@ -1119,12 +1170,13 @@
     }
     $('#login').hidden = true;
     $('#app').hidden = false;
-    if (DEMO && (tab === 'account' || tab === 'stats')) tab = 'shift';
+    if (DEMO && ['account', 'stats', 'coupon'].includes(tab)) tab = 'shift';
     renderTabs();
     changed({ rerender: true });
     syncPreview();
     if (tab === 'account') loadAccounts();
     if (tab === 'stats') loadStats();
+    if (tab === 'coupon') loadCoupon();
   }
   start();
 })();

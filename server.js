@@ -107,6 +107,50 @@ function currentUser(req) {
   return c.users[i];
 }
 
+// ---------- あいことばクーポン（PHP 版と同じ規則。3:01 区切り・前日と同じものは選ばない） ----------
+const COUPON_FILE = path.join(DATA_DIR, 'coupon.json');
+const jst = (t) => new Date(t + 9 * 3600e3); // 日本時間の日付計算用
+const couponDay = (t = Date.now()) => jst(t - (3 * 3600 + 60) * 1000).toISOString().slice(0, 10);
+function couponTerm(day) {
+  const from = Date.parse(day + 'T03:01:00+09:00'), to = from + 86400e3 - 60e3;
+  const f = (t) => { const d = jst(t); return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+  return { day, from: f(from), to: f(to) };
+}
+const couponActive = (list) => (list || []).filter((x) => x && x.on !== false && String(x.text || '').trim() && x.id);
+function couponPick(active, avoid) {
+  const pool = active.length > 1 ? active.filter((x) => x.id !== avoid) : active;
+  return pool[crypto.randomInt(pool.length)];
+}
+function couponToday(site) {
+  const cp = site.coupon || {};
+  if (!cp.enabled) return null;
+  const words = couponActive(cp.words), perks = couponActive(cp.perks);
+  if (!words.length || !perks.length) return null;
+  const state = fs.existsSync(COUPON_FILE) ? JSON.parse(fs.readFileSync(COUPON_FILE, 'utf8')) : { days: {} };
+  const day = couponDay();
+  const today = state.days[day];
+  let w = today && words.find((x) => x.id === today.wordId);
+  let p = today && perks.find((x) => x.id === today.perkId);
+  if (!w || !p) {
+    const prev = state.days[couponDay(Date.parse(day + 'T12:00:00+09:00') - 86400e3)] || {};
+    w ||= couponPick(words, prev.wordId);
+    p ||= couponPick(perks, prev.perkId);
+  }
+  state.days[day] = { wordId: w.id, perkId: p.id, word: w.text.trim(), perk: p.text.trim() };
+  state.days = Object.fromEntries(Object.entries(state.days).sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 90));
+  fs.writeFileSync(COUPON_FILE, JSON.stringify(state, null, 2));
+  return { word: w.text.trim(), perk: p.text.trim(), ...couponTerm(day) };
+}
+function couponHistory(n = 14) {
+  const state = fs.existsSync(COUPON_FILE) ? JSON.parse(fs.readFileSync(COUPON_FILE, 'utf8')) : { days: {} };
+  return Object.entries(state.days).slice(0, n).map(([day, d]) => ({ word: d.word, perk: d.perk, ...couponTerm(day) }));
+}
+function publicSite(site) {
+  const out = { ...site, couponToday: couponToday(site) };
+  if (site.coupon) out.coupon = { title: site.coupon.title || '', note: site.coupon.note || '' };
+  return out;
+}
+
 async function saveSite(site) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   if (fs.existsSync(DATA)) await fsp.copyFile(DATA, path.join(BACKUP, `site-${stamp}.json`));
@@ -122,7 +166,9 @@ async function api(req, res, url) {
   if (req.method !== 'GET' && !sameOrigin(req)) return json(res, 403, { error: '不正なリクエストです' });
 
   if (route === 'GET /api/site') {
-    return json(res, 200, JSON.parse(await fsp.readFile(DATA, 'utf8')));
+    const site = JSON.parse(await fsp.readFile(DATA, 'utf8'));
+    // ログイン中（管理画面）は全部、一般の閲覧者には合言葉・特典の一覧を渡さず今日の分だけ
+    return json(res, 200, currentUser(req) ? { ...site, couponToday: couponToday(site) } : publicSite(site));
   }
   // アクセス集計は本番（さくら・PHP 版）で行う。手元の Node 版では受け取るだけ
   if (route === 'POST /api/hit') { res.writeHead(204); return res.end(); }
@@ -146,6 +192,9 @@ async function api(req, res, url) {
   const me = currentUser(req);
   if (!me) return json(res, 401, { error: 'ログインが必要です' });
 
+  if (route === 'GET /api/coupon') {
+    return json(res, 200, { today: couponToday(JSON.parse(await fsp.readFile(DATA, 'utf8'))), history: couponHistory(14) });
+  }
   if (route === 'GET /api/stats') {
     const days = Math.max(1, Math.min(400, Number(url.searchParams.get('days')) || 30));
     const list = Array.from({ length: days }, (_, i) => {
@@ -225,6 +274,7 @@ async function api(req, res, url) {
     if (!site || typeof site !== 'object' || !site.shop || !Array.isArray(site.casts)) {
       return json(res, 400, { error: 'データの形式が正しくありません' });
     }
+    delete site.couponToday; // 表示用に付けた値は保存しない
     await saveSite(site);
     return json(res, 200, { ok: true });
   }

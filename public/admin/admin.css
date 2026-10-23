@@ -271,3 +271,19 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .resolved.bad { color: var(--danger); }
 .inline + .resolved { margin: -2px 0 10px 126px; }
 @media (max-width: 520px) { .inline + .resolved { margin-left: 0; } }
+
+/* クーポン */
+.coupon-today { border: 2px solid var(--accent); border-radius: var(--radius); background: #fffaf0; padding: 12px 14px; margin-bottom: 12px; display: grid; gap: 2px; }
+.coupon-today.none { border-style: dashed; background: #faf9f7; }
+.coupon-today span { font-size: 11px; color: #8a5a00; }
+.coupon-today b { font-size: 22px; letter-spacing: .05em; }
+.coupon-today em { font-style: normal; font-weight: 600; color: #8a5a00; }
+.coupon-today p { font-size: 12px; color: var(--muted); }
+.coupon-row .sw { flex: none; }
+.coupon-row input:not([type=checkbox]) { flex: 1; }
+.coupon-row.off input:not([type=checkbox]) { color: var(--muted); text-decoration: line-through; }
+h3 .count { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.coupon-hist { list-style: none; display: grid; gap: 4px; font-size: 12px; }
+.coupon-hist li { display: grid; grid-template-columns: 6.5em auto 1fr; gap: 8px; align-items: baseline; }
+.coupon-hist span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.coupon-hist em { font-style: normal; color: var(--muted); }

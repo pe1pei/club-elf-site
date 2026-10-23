@@ -7,7 +7,15 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $route = $method . ' ' . trim((string) ($_GET['r'] ?? ''), '/');
 if ($method !== 'GET' && !same_origin()) json_out(403, ['error' => '不正なリクエストです']);
 
-if ($route === 'GET site') json_out(200, load_site());
+// サイトのデータ。ログイン中（管理画面）は全部、一般の閲覧者には合言葉・特典の一覧を渡さず今日の分だけ
+if ($route === 'GET site') {
+    $site = load_site();
+    if (!empty($_COOKIE['elf_admin'])) {
+        start_session();
+        if (current_user()) json_out(200, $site + ['couponToday' => coupon_today($site)]);
+    }
+    json_out(200, public_site($site));
+}
 
 // 公開ページの表示を1回数える（ログイン中のスタッフの閲覧は数えない）。応答は空
 if ($route === 'POST hit') {
@@ -49,6 +57,8 @@ $me = current_user();
 if (!$me) json_out(401, ['error' => 'ログインが必要です']);
 $isAdmin = ($me['role'] ?? '') === 'admin';
 
+if ($route === 'GET coupon') json_out(200, ['today' => coupon_today(load_site()), 'history' => coupon_history(14)]);
+
 if ($route === 'GET stats') json_out(200, stats_summary((int) ($_GET['days'] ?? 30)));
 
 if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false, 'user' => public_user($me)]);
@@ -56,6 +66,7 @@ if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false
 if ($route === 'PUT site') {
     $site = read_json(2_000_000);
     if (!is_array($site['shop'] ?? null) || !is_array($site['casts'] ?? null)) json_out(400, ['error' => 'データの形式が正しくありません']);
+    unset($site['couponToday']); // 表示用に付けた値は保存しない
     save_site($site);
     json_out(200, ['ok' => true]);
 }
