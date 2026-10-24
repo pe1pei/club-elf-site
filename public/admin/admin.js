@@ -138,7 +138,7 @@
       s.recruit[k].items ||= []; s.recruit[k].perks ||= [];
     }
     s.recruit.apply ||= {};
-    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; c.sns = obj(c.sns); if (c.visible === undefined) c.visible = true; }
+    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; c.sns = obj(c.sns); c.photos = Array.isArray(c.photos) ? c.photos.filter(Boolean) : []; if (!c.photos.length && c.photo) c.photos = [c.photo]; c.photo = c.photos[0] || ''; if (c.visible === undefined) c.visible = true; }
     return s;
   }
   const getPath = (p) => p.split('.').reduce((o, k) => o?.[k], site);
@@ -574,13 +574,19 @@
               ${ord('casts', i, site.casts.length)}
             </div>
             ${open ? `<div class="edit">
-              <div class="edit-photo">
-                <button class="thumb" data-act="cast-photo" data-i="${i}">${c.photo ? `<img src="${esc(imgSrc(c.photo))}" alt="">` : '写真'}</button>
-                <div class="bar">
-                  <button class="btn sm" data-act="cast-photo" data-i="${i}">${c.photo ? '写真を変更' : '写真を選ぶ'}</button>
-                  ${c.photo ? `<button class="btn sm ghost" data-act="cast-photo-clear" data-i="${i}">写真を外す</button>` : ''}
-                </div>
+              <div class="photo-ed">
+                ${c.photos.map((u, k) => `<div class="photo-item">
+                  <img src="${esc(imgSrc(u))}" alt="">
+                  ${k === 0 ? '<span class="main-tag">メイン</span>' : ''}
+                  <div class="ops">
+                    <button data-act="cast-photo-move" data-i="${i}" data-k="${k}" data-d="-1" ${k === 0 ? 'disabled' : ''} aria-label="前へ">←</button>
+                    <button data-act="cast-photo-move" data-i="${i}" data-k="${k}" data-d="1" ${k === c.photos.length - 1 ? 'disabled' : ''} aria-label="後ろへ">→</button>
+                    <button data-act="cast-photo-del" data-i="${i}" data-k="${k}" aria-label="この写真を外す">×</button>
+                  </div>
+                </div>`).join('')}
+                <button class="add-tile photo-add" data-act="cast-photo" data-i="${i}">＋ 写真を追加<br><small>複数選べます</small></button>
               </div>
+              <p class="hint">1枚目が<b>メイン写真</b>（一覧・カルーセルに出る写真）です。← → で並べ替え。プロフィールを開くと全部の写真を見られます。</p>
               ${field('名前', `casts.${i}.name`)}
               ${field('プロフィール', `casts.${i}.profile`, { ph: '例：T158 / O型' })}
               ${field('タグ', `casts.${i}.tags`, { ph: '例：新人、No.1', hint: '「、」区切りで複数', list: true })}
@@ -987,7 +993,7 @@
       return panel.querySelectorAll('input')[panel.querySelectorAll('input').length - 1]?.focus();
     }
     if (act === 'cast-add') {
-      const c = { id: uid(), name: '', profile: '', tags: ['新人'], comment: '', photo: '', sns: {}, visible: true };
+      const c = { id: uid(), name: '', profile: '', tags: ['新人'], comment: '', photo: '', photos: [], sns: {}, visible: true };
       site.casts.unshift(c);
       openItems.add(c.id);
       changed({ rerender: true });
@@ -995,14 +1001,25 @@
       return panel.querySelector('[data-path="casts.0.name"]')?.focus();
     }
     if (act === 'cast-photo') {
-      const [file] = await pickFiles(false);
-      if (!file) return;
-      const url = await upload(file, 1200);
-      if (url) { site.casts[i].photo = url; changed({ rerender: true }); }
+      const c = site.casts[i];
+      const files = await pickFiles(true);
+      for (const f of files) {
+        const url = await upload(f, 1200);
+        if (url) { c.photos.push(url); c.photo = c.photos[0]; openItems.add(c.id); changed({ rerender: true }); }
+      }
       return;
     }
-    if (act === 'cast-photo-clear') {
-      site.casts[i].photo = '';
+    if (act === 'cast-photo-move') {
+      const c = site.casts[i], k = Number(b.dataset.k), j = k + Number(b.dataset.d);
+      if (j < 0 || j >= c.photos.length) return;
+      [c.photos[k], c.photos[j]] = [c.photos[j], c.photos[k]];
+      c.photo = c.photos[0];
+      return changed({ rerender: true });
+    }
+    if (act === 'cast-photo-del') {
+      const c = site.casts[i];
+      c.photos.splice(Number(b.dataset.k), 1);
+      c.photo = c.photos[0] || '';
       return changed({ rerender: true });
     }
     if (act === 'logo-set') {

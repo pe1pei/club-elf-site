@@ -82,8 +82,9 @@
   const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) || /^[\w-]+\.(png|jpe?g|webp|gif|svg)$/i.test(u) ? u : safeUrl(u));
   // 写真未登録のキャストは店のロゴ画像を出す
   const NO_PHOTO = 'no-photo.jpg';
-  const photoImg = (c, alt, lazy) => c.photo
-    ? `<img src="${esc(imgUrl(c.photo))}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`
+  const castPhotos = (c) => (Array.isArray(c.photos) && c.photos.length ? c.photos : c.photo ? [c.photo] : []).filter(Boolean);
+  const photoImg = (c, alt, lazy) => castPhotos(c).length
+    ? `<img src="${esc(imgUrl(castPhotos(c)[0]))}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`
     : `<img class="no-photo" src="${NO_PHOTO}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
   const cssUrl = (u) => imgUrl(u).replace(/["'()\\\s]/g, encodeURIComponent);
   const telNo = (p) => String(p || '').replace(/[^\d+]/g, '');
@@ -572,6 +573,30 @@
     }, Math.max(2, Number(sec) || 6) * 1000);
   }
 
+  // プロフィール画面の写真。2枚以上なら、矢印・サムネイル・スワイプで切り替える（ふわっと入れ替わる）
+  function galleryHTML(c) {
+    const photos = castPhotos(c);
+    if (photos.length < 2) return `<div class="modal-media"><div class="modal-ph">${photoImg(c, c.name, false)}</div></div>`;
+    return `<div class="modal-media">
+      <div class="modal-ph gallery" data-gal-idx="0">
+        ${photos.map((u, k) => `<img class="gal-img ${k ? '' : 'on'}" src="${esc(imgUrl(u))}" alt="${esc(c.name)}（${k + 1}枚目）" ${k ? 'loading="lazy"' : ''}>`).join('')}
+        <button class="gal-nav prev" data-gal="-1" aria-label="前の写真">‹</button>
+        <button class="gal-nav next" data-gal="1" aria-label="次の写真">›</button>
+        <span class="gal-count">1 / ${photos.length}</span>
+      </div>
+      <div class="gal-thumbs">${photos.map((u, k) => `<button class="${k ? '' : 'on'}" data-gal-to="${k}" aria-label="${k + 1}枚目"><img src="${esc(imgUrl(u))}" alt="" loading="lazy"></button>`).join('')}</div>
+    </div>`;
+  }
+  function galShow(gal, idx) {
+    const imgs = gal.querySelectorAll('.gal-img');
+    const n = imgs.length;
+    idx = ((idx % n) + n) % n;
+    gal.dataset.galIdx = idx;
+    imgs.forEach((im, k) => im.classList.toggle('on', k === idx));
+    gal.querySelector('.gal-count').textContent = `${idx + 1} / ${n}`;
+    gal.closest('.modal-media').querySelectorAll('.gal-thumbs button').forEach((b, k) => b.classList.toggle('on', k === idx));
+  }
+
   function openCast(id) {
     const c = (site.casts || []).find((x) => x.id === id);
     const dlg = document.getElementById('castModal');
@@ -581,7 +606,7 @@
     const week = on ? Array.from({ length: 7 }, (_, i) => addDays(tk, i)) : [];
     dlg.innerHTML = `<div class="modal-inner">
       <button class="modal-close" aria-label="閉じる">×</button>
-      <div class="modal-ph">${photoImg(c, c.name, false)}</div>
+      ${galleryHTML(c)}
       <div class="modal-body">
         ${on && shiftOf(site, tk, c.id) ? `<span class="badge static">本日出勤 ${esc(shiftOf(site, tk, c.id))}</span>` : ''}
         <h3>${esc(c.name)}</h3>
@@ -624,6 +649,12 @@
     if (day) { schedDay = Number(day.dataset.day); patch('schedule', scheduleHTML(site)); return; }
     const c = e.target.closest('.cast, .sc');
     if (c) { openCast(c.dataset.id); return; }
+    const gnav = e.target.closest('[data-gal], [data-gal-to]');
+    if (gnav) {
+      const gal = gnav.closest('.modal-media').querySelector('.gallery');
+      galShow(gal, gnav.dataset.galTo !== undefined ? Number(gnav.dataset.galTo) : Number(gal.dataset.galIdx) + Number(gnav.dataset.gal));
+      return;
+    }
     const dlg = e.target.closest('dialog');
     if (dlg && (e.target === dlg || e.target.closest('.modal-close'))) { dlg.close(); return; }
     // プレビュー中に別ページへのリンクを押したら、管理画面側でタブを切り替える
@@ -669,6 +700,14 @@
     cfDrag.lastX = e.clientX; cfDrag.lastT = now;
     cfDrag.pos = cfDrag.pos0 - dx / cfDrag.step;
     layoutCF(cfDrag.pos === cfIndex ? cfDrag.pos + 1e-6 : cfDrag.pos);
+  });
+  let galDrag = null;
+  app.addEventListener('pointerdown', (e) => { const g = e.target.closest('.gallery'); if (g && !e.target.closest('button')) galDrag = { g, x: e.clientX, y: e.clientY }; });
+  addEventListener('pointerup', (e) => {
+    if (!galDrag) return;
+    const { g, x, y } = galDrag; galDrag = null;
+    const dx = e.clientX - x, dy = e.clientY - y;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) galShow(g, Number(g.dataset.galIdx) + (dx < 0 ? 1 : -1));
   });
   const endDrag = () => {
     if (!cfDrag) return;
