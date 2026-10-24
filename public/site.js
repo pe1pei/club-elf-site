@@ -604,7 +604,7 @@
     const on = shiftOn(site);
     const tk = todayKey(site);
     const week = on ? Array.from({ length: 7 }, (_, i) => addDays(tk, i)) : [];
-    dlg.innerHTML = `<div class="modal-inner">
+    dlg.innerHTML = `<div class="modal-inner${castPhotos(c).length > 1 ? ' has-gal' : ''}">
       <button class="modal-close" aria-label="閉じる">×</button>
       ${galleryHTML(c)}
       <div class="modal-body">
