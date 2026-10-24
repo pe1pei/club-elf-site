@@ -340,3 +340,12 @@ p, dd, small { text-wrap: pretty; }
   .modal-body { max-height: none; overflow: visible; display: block; padding: 22px 20px 48px; }
   .modal-close { position: fixed; top: 12px; right: 12px; z-index: 5; border-radius: 50%; }
 }
+
+/* ---------- 写真は切り取らない ----------
+   どの枠でも写真全体を表示（contain）し、枠と縦横比が違って余った部分は、同じ写真をぼかした背景で埋める */
+.ph.fit, .modal-ph.fit { background: #000; isolation: isolate; }
+.ph.fit::before, .modal-ph.fit::before { content: ""; position: absolute; inset: -24px; z-index: -1; background: var(--ph-bg, none) center / cover no-repeat;
+  filter: blur(18px) brightness(.5) saturate(1.1); }
+.ph.fit > img, .modal-ph.fit > img, .modal-ph.fit .gal-img { object-fit: contain; }
+.ph.fit > img, .modal-ph.fit > img:not(.gal-img) { position: relative; } /* ギャラリーの写真は重ねて切り替えるので除く */
+.ph.fit > img.no-photo { object-fit: cover; } /* 写真なしのロゴ画像は枠いっぱいに */

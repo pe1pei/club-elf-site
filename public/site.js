@@ -82,6 +82,7 @@
   const imgUrl = (u) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(u) || /^\/?uploads\//.test(u) || /^[\w-]+\.(png|jpe?g|webp|gif|svg)$/i.test(u) ? u : safeUrl(u));
   // 写真未登録のキャストは店のロゴ画像を出す
   const NO_PHOTO = 'no-photo.jpg';
+  const phBg = (c) => { const u = castPhotos(c)[0]; return u ? ` style="--ph-bg:url('${cssUrl(u)}')"` : ''; };
   const castPhotos = (c) => (Array.isArray(c.photos) && c.photos.length ? c.photos : c.photo ? [c.photo] : []).filter(Boolean);
   const photoImg = (c, alt, lazy) => castPhotos(c).length
     ? `<img src="${esc(imgUrl(castPhotos(c)[0]))}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`
@@ -256,7 +257,7 @@
       body = `<div class="${layout === 'grid' ? 'cast-grid' : 'cast-strip'}">${list.map((c) => `
         <div class="cast-card">
           <button class="cast" data-id="${esc(c.id)}">
-            <div class="ph">${photoImg(c, c.name, true)}${badge(c)}</div>
+            <div class="ph fit"${phBg(c)}>${photoImg(c, c.name, true)}${badge(c)}</div>
             <p class="nm">${esc(c.name)}</p>
           </button>
           ${castSns(c)}
@@ -268,7 +269,7 @@
       body = `<div class="cf cf-${esc(layout)}" data-mode="${esc(layout)}" tabindex="0" aria-roledescription="カルーセル" aria-label="キャスト紹介（左右キーで切り替え）">
         <div class="cf-stage">${list.map((c, i) => `
           <button class="cf-item" data-i="${i}" data-id="${esc(c.id)}" aria-label="${esc(c.name)}">
-            <div class="ph">${photoImg(c, c.name, i > 4)}${badge(c)}</div>
+            <div class="ph fit"${phBg(c)}>${photoImg(c, c.name, i > 4)}${badge(c)}</div>
           </button>`).join('')}</div>
         ${list.length > 1 ? '<button class="cf-nav prev" data-cf="-1" aria-label="前のキャスト">‹</button><button class="cf-nav next" data-cf="1" aria-label="次のキャスト">›</button>' : ''}
       </div>
@@ -576,9 +577,10 @@
   // プロフィール画面の写真。2枚以上なら、矢印・サムネイル・スワイプで切り替える（ふわっと入れ替わる）
   function galleryHTML(c) {
     const photos = castPhotos(c);
-    if (photos.length < 2) return `<div class="modal-media"><div class="modal-ph">${photoImg(c, c.name, false)}</div></div>`;
+    const bg = (u) => (u ? ` style="--ph-bg:url('${cssUrl(u)}')"` : '');
+    if (photos.length < 2) return `<div class="modal-media"><div class="modal-ph fit"${bg(photos[0])}>${photoImg(c, c.name, false)}</div></div>`;
     return `<div class="modal-media">
-      <div class="modal-ph gallery" data-gal-idx="0">
+      <div class="modal-ph fit gallery" data-gal-idx="0"${bg(photos[0])}>
         ${photos.map((u, k) => `<img class="gal-img ${k ? '' : 'on'}" src="${esc(imgUrl(u))}" alt="${esc(c.name)}（${k + 1}枚目）" ${k ? 'loading="lazy"' : ''}>`).join('')}
         <button class="gal-nav prev" data-gal="-1" aria-label="前の写真">‹</button>
         <button class="gal-nav next" data-gal="1" aria-label="次の写真">›</button>
@@ -592,6 +594,7 @@
     const n = imgs.length;
     idx = ((idx % n) + n) % n;
     gal.dataset.galIdx = idx;
+    gal.style.setProperty('--ph-bg', `url('${cssUrl(imgs[idx].getAttribute('src'))}')`);
     imgs.forEach((im, k) => im.classList.toggle('on', k === idx));
     gal.querySelector('.gal-count').textContent = `${idx + 1} / ${n}`;
     gal.closest('.modal-media').querySelectorAll('.gal-thumbs button').forEach((b, k) => b.classList.toggle('on', k === idx));
