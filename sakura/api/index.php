@@ -64,9 +64,11 @@ if ($route === 'GET stats') json_out(200, stats_summary((int) ($_GET['days'] ?? 
 if ($route === 'GET me') json_out(200, ['ok' => true, 'defaultPassword' => false, 'user' => public_user($me)]);
 
 if ($route === 'PUT site') {
-    $site = read_json(2_000_000);
-    if (!is_array($site['shop'] ?? null) || !is_array($site['casts'] ?? null)) json_out(400, ['error' => 'データの形式が正しくありません']);
-    unset($site['couponToday']); // 表示用に付けた値は保存しない
+    $raw = read_body(2_000_000);
+    $check = json_decode($raw, true);
+    if (!is_array($check['shop'] ?? null) || !is_array($check['casts'] ?? null)) json_out(400, ['error' => 'データの形式が正しくありません']);
+    $site = json_decode($raw); // オブジェクトのまま扱い、空の {} を [] にしない
+    unset($site->couponToday); // 表示用に付けた値は保存しない
     save_site($site);
     json_out(200, ['ok' => true]);
 }

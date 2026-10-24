@@ -122,7 +122,10 @@
     s.system.plans ||= [];
     s.system.plans.forEach((p) => { p.items ||= []; });
     s.shift ||= { enabled: false, defaultTime: '20:00〜', dayStart: 6 }; // 出勤情報は初期状態で非表示
-    s.shifts ||= {};
+    // サーバー側で空の {} が [] になっていても、入力が消えないよう入れ物の形を直す
+    const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+    s.shifts = obj(s.shifts);
+    for (const k of Object.keys(s.shifts)) s.shifts[k] = obj(s.shifts[k]);
     // 旧形式（キャストごとの today フラグ）を日付ベースの出勤表へ移す
     const tk = todayKeyOf(s);
     for (const c of s.casts || []) {
@@ -135,7 +138,7 @@
       s.recruit[k].items ||= []; s.recruit[k].perks ||= [];
     }
     s.recruit.apply ||= {};
-    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; c.sns ||= {}; if (c.visible === undefined) c.visible = true; }
+    for (const c of s.casts) { c.id ||= uid(); c.tags ||= []; c.sns = obj(c.sns); if (c.visible === undefined) c.visible = true; }
     return s;
   }
   const getPath = (p) => p.split('.').reduce((o, k) => o?.[k], site);

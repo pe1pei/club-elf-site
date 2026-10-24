@@ -38,7 +38,9 @@ function load_site(): array {
     return is_array($site) ? $site : [];
 }
 
-function save_site(array $site): void {
+// $site は配列でもオブジェクトでもよい。管理画面からの保存はオブジェクトのまま受け取り、
+// 空の {}（キャストの SNS・出勤など）が [] に化けないようにする（化けると管理画面での入力が保存されなくなる）
+function save_site(array|object $site): void {
     if (!is_dir(BACKUP_DIR)) mkdir(BACKUP_DIR, 0705, true);
     if (is_file(SITE_FILE)) copy(SITE_FILE, BACKUP_DIR . '/site-' . date('Ymd-His') . '-' . bin2hex(random_bytes(2)) . '.json');
     $tmp = SITE_FILE . '.tmp';
